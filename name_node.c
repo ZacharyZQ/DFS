@@ -6,6 +6,7 @@ void name_node_init(int is_rebuild) {
     name_tree = dir_tree_init(is_rebuild);
 }
 
-static int create_name_node(int type, char *name, dirtree_node_t) {
+static int create_name_node(int type, char *name, dirtree_node_t *parent) {
+    dirtree_node_t *node = name_tree->
 }
 
