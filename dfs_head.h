@@ -25,4 +25,5 @@
 #include "mem_buf.h"
 #include "rbtree.h"
 #include "ms_client.h"
+#include "name_node.h"
 #endif

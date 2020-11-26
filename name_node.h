@@ -5,7 +5,7 @@
 #pragma pack(1)
 typedef struct block_s {
     unsigned char key[16];
-    int16_t store_slave_id[2]
+    int16_t store_slave_id[2];
     int16_t part;
     uint8_t padding[2];
     int32_t block_id;
@@ -27,4 +27,7 @@ typedef struct file_entry_s {
 #pragma pack()
 //0 128 256 384 512 640 768 896
 
+void name_node_init();
+int create_dir_name_node(char *path);
+int create_file_name_node(char *path);
 #endif
