@@ -16,7 +16,7 @@ void client_data_destory(client_data_t *cd) {
     if (cd->recv_buf.buf) {
         mem_buf_clean(&cd->recv_buf);
     }
-    free(fd);
+    free(cd);
 }
 
 int parse_client_request(client_data_t *cd, char *buf, ssize_t size) {
@@ -25,7 +25,7 @@ int parse_client_request(client_data_t *cd, char *buf, ssize_t size) {
     case RECV_NOTHING:
         if (cd->recv_buf.size >= sizeof(ms_context_t)) {
             memcpy(&cd->head, cd->recv_buf.buf, sizeof(ms_context_t));
-            if (check_ms_context(cd->head) != 0) {
+            if (check_ms_context(&cd->head) != 0) {
                 return -1;
             }
             cd->recv_stage ++;
@@ -66,7 +66,7 @@ int parse_client_request(client_data_t *cd, char *buf, ssize_t size) {
 }
 
 int process_client_request(client_data_t *cd) {
-
+    return 0;
 }
 
 void accept_client_timeout(cycle_t *cycle, struct timer_s *timer,
@@ -114,7 +114,7 @@ void read_client_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
     } else {
         client_data_t *cd = NULL;
         if (data == NULL) {
-            cd = init_client_data(fde);
+            cd = client_data_init(fde);
         } else {
             cd = (client_data_t *)data;
         }
@@ -128,7 +128,7 @@ void read_client_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
         } else if (ret > 0) {
             cycle_set_timeout(cycle, &fde->timer, 5 * 1000,
                     read_client_request_timeout, cd);
-            cycle_set_event(cycle, client_fde, CYCLE_READ_EVENT,
+            cycle_set_event(cycle, fde, CYCLE_READ_EVENT,
                     read_client_request, cd);
             return ;
         } else {
@@ -151,12 +151,13 @@ void accept_client_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
                 listen_fde->fd, client_fde->fd);
         cycle_set_timeout(cycle, &client_fde->timer, 5*1000,
                 read_client_request_timeout, client_fde);
-        cycle_set_event(cycle, client_fde, CYCLE_READ_EVENT, read_request, NULL);
+        cycle_set_event(cycle, client_fde, CYCLE_READ_EVENT, read_client_request, NULL);
     }
     cycle_set_timeout(cycle, &listen_fde->timer, 5 * 1000, accept_client_timeout, NULL);
     cycle_set_event(cycle, listen_fde, CYCLE_READ_EVENT, accept_client_handler, NULL);
 }
 
+#if 0
 void test_network() {
     gettimeofday(&current_time_tv, NULL);
     current_time = current_time_tv.tv_sec;
@@ -184,3 +185,4 @@ void test_network() {
         cycle_check_timeouts(cycle);
     }
 }
+#endif

@@ -14,9 +14,9 @@ void time_update() {
     current_time = current_time_tv.tv_sec;
 }
 
-void log_init() {
+void log_init(const char *log_file_name) {
     time_update();
-    log_fp = fopen("run.log", "a+");;
+    log_fp = fopen(log_file_name, "a+");;
     //log_fp = NULL;
     //set_close_on_exec(fileno(log_fp));
     enable_debug_log = 1;

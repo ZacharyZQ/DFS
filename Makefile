@@ -1,6 +1,6 @@
 CC = gcc
 LINK = $(CC)
-CFLAGS = -Wall -Werror -g
+CFLAGS = -Wall -Werror -g -I./include
 LDFLAGS = 
 SOURCES = $(wildcard *.c)
 EX_MAIN_SOURCES = $(filter-out test.c slave_main.c master_main.c, $(SOURCES))
@@ -20,4 +20,5 @@ slave:$(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(EX_MAIN_OBJS) slave_main.o
 
 clean:
-	rm -f $(OBJS) test master slave run.log
+	rm -f $(OBJS) test master slave
+	rm -f log/*

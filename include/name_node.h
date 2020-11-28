@@ -19,7 +19,7 @@ typedef struct dir_entry_s {
 typedef struct file_entry_s {
     char name[32];
     uint32_t content_length;
-    int8_t split_file_ops_type;
+    int8_t MR_ops_type;
 } file_entry_t;
 #pragma pack()
 
@@ -37,6 +37,10 @@ int remove_file_name_node(char *path);
 //That is true Map-Reduce
 typedef struct {
     int8_t ops_type;
+/*
+ *  prepare private data for MAP and REDUCE
+ */
+    void *(*MR_init)();
 /*
  *  get next block and put it in buf, 
  *  @private_data:  every file's map reduce private data
@@ -59,8 +63,14 @@ typedef struct {
  *     MR_FAILED
  */
     int (*REDUCE)(void *private_data, char *buf, int size);
+/*
+ *  destory private data
+ */
+    void (*MR_destory)(void *private_data);
 } map_reduce_ops;
 
-split_file_ops *g_split_file_ops_array[128];
+map_reduce_ops *g_MR_ops_array[128];
+
+
 
 #endif

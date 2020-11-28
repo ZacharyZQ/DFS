@@ -1,5 +1,6 @@
-#include "dir_tree.h"
-#include <stdlib.h>
+#include "dfs_head.h"
+
+extern dirtree_node_alloc_ops default_alloc_ops;
 dir_tree_t *dir_tree_init(int is_rebuild) {
     dir_tree_t *tree = calloc(1, sizeof(dir_tree_t));
     tree->alloc_ops = &default_alloc_ops;
@@ -17,7 +18,7 @@ void dir_tree_destory(dir_tree_t * tree) {
 }
 
 void dir_tree_insert(dirtree_node_t *parent, dirtree_node_t *node) {
-    if (!parent->is_dir) {
+    if (parent->type != T_DIR) {
         return ;
     }
     node->parent_node = parent;
@@ -34,8 +35,20 @@ void tree_delete_recursive(dirtree_node_t *node) {
     
 }
 
+void default_alloc_init();
+dirtree_node_t *default_alloc_root_node();
+dirtree_node_t *default_alloc_dirtree_node();
+void default_free_dirtree_node(dirtree_node_t *);
+
+
+dirtree_node_alloc_ops default_alloc_ops = {
+    .init = default_alloc_init,
+    .alloc_root_node = default_alloc_root_node,
+    .alloc_dirtree_node = default_alloc_dirtree_node,
+    .free_dirtree_node = default_free_dirtree_node,
+};
+
 void default_alloc_init() {
-    
 }
 
 dirtree_node_t *default_alloc_root_node() {

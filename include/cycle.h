@@ -141,6 +141,7 @@ void cycle_connect_callback(cycle_t* cycle, cycle_connect_state_t* cs, int statu
 void cycle_connect(cycle_t* cycle, fd_entry_t* fde, struct in_addr ip,
         unsigned short port, time_t connect_timeout, CCB* callback, void* data);
 fd_entry_t* cycle_find_fde(cycle_t* cycle, int fd);
+int safe_inet_addr(const char* buf, struct in_addr* addr);
 
 
 #endif

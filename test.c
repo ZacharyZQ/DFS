@@ -135,7 +135,7 @@ int main() {
     printf("\n");
 #endif
 #ifdef TEST_LOG
-    log_init();
+    log_init("log/test.log");
     log(LOG_DEBUG, "hello world\n");
 #endif
     test_network();   
