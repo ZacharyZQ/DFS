@@ -1,4 +1,22 @@
 #include "dfs_head.h"
+int process_client_request(client_data_t *cd) {
+    switch (cd->head.method) {
+    case M_METHOD_CREATE:
+        break;
+    case M_METHOD_DELETE:
+    case M_METHOD_QUERY:
+    case S_METHOD_REG:
+        master_process_slave_register(cd);
+        break;
+    case S_METHOD_INFO:
+    case S_METHOD_UNREG:
+        master_process_slave_unregister(cd);
+    default:
+        assert(0);
+    }
+    return 0;
+}
+
 client_data_t *client_data_init(fd_entry_t *fde) {
     client_data_t *cd = calloc(1, sizeof(client_data_t));
     cd->fde = fde;
@@ -63,10 +81,6 @@ int parse_client_request(client_data_t *cd, char *buf, ssize_t size) {
         assert(0);
     }
     return -1;
-}
-
-int process_client_request(client_data_t *cd) {
-    return 0;
 }
 
 void accept_client_timeout(cycle_t *cycle, struct timer_s *timer,
@@ -156,33 +170,3 @@ void accept_client_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
     cycle_set_timeout(cycle, &listen_fde->timer, 5 * 1000, accept_client_timeout, NULL);
     cycle_set_event(cycle, listen_fde, CYCLE_READ_EVENT, accept_client_handler, NULL);
 }
-
-#if 0
-void test_network() {
-    gettimeofday(&current_time_tv, NULL);
-    current_time = current_time_tv.tv_sec;
-    cycle_t *cycle = init_cycle();
-    struct in_addr ia;
-    ia.s_addr = INADDR_ANY;
-    int listen_fd = open_listen_fd(
-            CYCLE_NONBLOCKING | CYCLE_REUSEADDR | CYCLE_REUSEPORT,
-            ia, 38888, 1);
-    fd_entry_t *listen_fde = cycle_create_listen_fde(cycle, listen_fd);
-    cycle_listen(cycle, listen_fde);
-    cycle_set_timeout(cycle, &listen_fde->timer, 1000, accept_client_timeout, NULL);
-    cycle_set_event(cycle, listen_fde, CYCLE_READ_EVENT, accept_client_handler, NULL);
-
-    while (1) {
-        struct timeval tv; 
-        gettimeofday(&tv, NULL);
-        current_time_tv = tv; 
-        current_time = current_time_tv.tv_sec;
-        LIST_HEAD(accept_events);
-        LIST_HEAD(normal_events);
-        cycle_wait_post_event(cycle, &accept_events, &normal_events);
-        process_posted_events(cycle, &accept_events);
-        process_posted_events(cycle, &normal_events);
-        cycle_check_timeouts(cycle);
-    }
-}
-#endif

@@ -25,7 +25,6 @@ struct ms_context_s {
     int16_t extra_length;
     int16_t extra_data_type;
     int16_t content_length;
-    int64_t seq_num;
     unsigned char padding[2];
     unsigned char key[16];
 };
