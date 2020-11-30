@@ -1,5 +1,52 @@
 #include "dfs_head.h"
-int process_client_request(client_data_t *cd) {
+void client_data_destory(client_data_t *cd);
+
+
+void master_process_slave_register(client_data_t *cd) {
+    int i = 0;
+    for (i = 1; i < MAX_SLAVE; i ++) {
+        if (slave_group[i] == NULL) {
+            break;
+        }
+    }
+    if (i == MAX_SLAVE) {
+        log(LOG_RUN_ERROR, "Too many slave register in master, register error\n");
+        return ;
+    }
+    slave_info_t *d = (slave_info_t *)cd->extra_buf;
+    d->slave_id = (int16_t)i;
+    cd->extra_buf = NULL;
+    cd->head.extra_length = 0;
+    cd->head.method = METHOD_ACK;
+    cd->head.slave_id = (int16_t)i;
+    assert(!cd->content_buf);
+    assert(!cd->head.content_length);
+    log(LOG_RUN_ERROR, "the alloc slave id is %hd\n", d->slave_id);
+}
+
+void master_process_slave_unregister(client_data_t *cd) {
+
+}
+
+void send_client_reply_done(struct cycle_s *cycle, struct fd_entry_s *fde, ssize_t size, 
+                    int flag, void* data)
+{
+    client_data_t *cd = (client_data_t *)data;
+    if (flag != CYCLE_OK) {
+        log(LOG_RUN_ERROR, "fd %d\n", fde->fd);
+    }
+    cycle_close(cycle, fde);
+    client_data_destory(cd);
+}
+void send_client_reply_timeout(cycle_t *cycle, struct timer_s *timer, void* data) {
+    client_data_t *cd = (client_data_t *)data;
+    fd_entry_t *fde = cd->fde;
+    log(LOG_RUN_ERROR, "fd %d\n", fde->fd);
+    cycle_close(cycle, fde);
+    client_data_destory(cd);
+}
+
+void process_client_request(cycle_t *cycle, client_data_t *cd) {
     switch (cd->head.method) {
     case M_METHOD_CREATE:
         break;
@@ -14,7 +61,19 @@ int process_client_request(client_data_t *cd) {
     default:
         assert(0);
     }
-    return 0;
+    assert(cd->head.method == METHOD_ACK);
+    char *buf = calloc(1, 2 * 1048576);
+    memcpy(buf, &cd->head, sizeof(ms_context_t));
+    if (cd->head.extra_length != 0) {
+        memcpy(buf + sizeof(ms_context_t), cd->extra_buf, cd->head.extra_length);
+    }
+    if (cd->head.content_length != 0) {
+        memcpy(buf + sizeof(ms_context_t) + cd->head.extra_length,
+                cd->content_buf, cd->head.content_length);
+    }
+    int size = sizeof(ms_context_t) + cd->head.extra_length + cd->head.content_length;
+    cycle_set_timeout(cycle, &cd->fde->timer, 5 * 1000, send_client_reply_timeout, cd);
+    cycle_write(cycle, cd->fde, buf, size, 2 * 1048576, send_client_reply_done, cd);
 }
 
 client_data_t *client_data_init(fd_entry_t *fde) {
@@ -90,40 +149,40 @@ void accept_client_timeout(cycle_t *cycle, struct timer_s *timer,
 void read_client_request_timeout(cycle_t *cycle, struct timer_s *timer,
         void* data)
 {
-    fd_entry_t *fde = (fd_entry_t *)data;
+    fd_entry_t *fde = (fd_entry_t *)((char *)timer - offsetof(fd_entry_t, timer));
     log(LOG_DEBUG, "fd %d\n", fde->fd);
     cycle_close(cycle, fde);
-}
-void send_client_reply_timeout(cycle_t *cycle, struct timer_s *timer,
-        void* data)
-{
-    fd_entry_t *fde = (fd_entry_t *)data;
-    log(LOG_DEBUG, "fd %d\n", fde->fd);
-    cycle_close(cycle, fde);
-}
-void send_client_reply_done(cycle_t* cycle, fd_entry_t* fde, ssize_t size,
-        int flag, void* data)
-{
-    log(LOG_DEBUG, "fd %d, write size %ld, flag %d\n", fde->fd, size, flag);
-    cycle_close(cycle, fde);
+    if (data != NULL) {
+        client_data_t *cd = (client_data_t *)data;
+        client_data_destory(cd);
+    }
 }
 
 void read_client_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
     char buf[1048576 * 2];
     ssize_t size = read(fde->fd, buf, sizeof(buf));
+    log(LOG_DEBUG, "read %ld bytes from fd %d\n", size, fde->fd);
     if (size < 0) {
         if (errno_ignorable(errno)) {
             cycle_set_timeout(cycle, &fde->timer, 5 * 1000,
-                    read_client_request_timeout, fde);
-            cycle_set_event(cycle, fde, CYCLE_READ_EVENT, read_client_request, NULL);
+                    read_client_request_timeout, data);
+            cycle_set_event(cycle, fde, CYCLE_READ_EVENT, read_client_request, data);
         } else {
             log(LOG_DEBUG, "read error, close, fd is %d\n", fde->fd);
             cycle_close(cycle, fde);
+            if (data != NULL) {
+                client_data_t *cd = (client_data_t *)data;
+                client_data_destory(cd);
+            }
         }
         return ;
     } else if (size == 0) {
         log(LOG_DEBUG, "close by client, fd is %d\n", fde->fd);
         cycle_close(cycle, fde);
+        if (data != NULL) {
+            client_data_t *cd = (client_data_t *)data;
+            client_data_destory(cd);
+        }
         return;
     } else {
         client_data_t *cd = NULL;
@@ -146,11 +205,9 @@ void read_client_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
                     read_client_request, cd);
             return ;
         } else {
-            process_client_request(cd);
+            process_client_request(cycle, cd);
             return ;
         }
-        //cycle_set_timeout(cycle, &fde->timer, 5 * 1000, send_reply_timeout, fde);
-        //cycle_write(cycle, fde, buf, size, size, send_reply_done, NULL);
     }
 }
 
@@ -164,7 +221,7 @@ void accept_client_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
         log(LOG_DEBUG, "accept slave connection, listen_fd %d, client fd %d\n",
                 listen_fde->fd, client_fde->fd);
         cycle_set_timeout(cycle, &client_fde->timer, 5*1000,
-                read_client_request_timeout, client_fde);
+                read_client_request_timeout, NULL);
         cycle_set_event(cycle, client_fde, CYCLE_READ_EVENT, read_client_request, NULL);
     }
     cycle_set_timeout(cycle, &listen_fde->timer, 5 * 1000, accept_client_timeout, NULL);

@@ -1,6 +1,7 @@
 #ifndef __MS_H_
 #define __MS_H_
 #include <stdint.h>
+#include "master.h"
 #define M_METHOD_CREATE ((uint16_t)1)
 #define M_METHOD_DELETE ((uint16_t)2)
 #define M_METHOD_QUERY  ((uint16_t)3)
@@ -31,35 +32,5 @@ struct ms_context_s {
 #pragma pack()
 typedef struct ms_context_s ms_context_t;
 int check_ms_context(ms_context_t *);
-
-typedef int EDP(void *buf, int16_t extra_data_length, void *data);
-
-#define REG_REQUEST_TYPE 1
-typedef struct reg_request_s {
-    char slave_name[16];
-    uint32_t free_block_num;
-    uint32_t free_extra_page_num;
-    uint32_t capacity_page_num;
-    uint32_t type;
-} reg_request_t;
-int parse_reg_request(void *buf, int16_t extra_data_length, void *data);
-
-#define REG_REPLY_TYPE 2
-typedef struct reg_reply_s {
-    int16_t status;
-    int16_t server_id;
-} reg_reply_t;
-int parse_reg_reply(void *buf, int16_t extra_data_length, void *data);
-
-#define INFO_FORWARD_TYPE 3
-typedef struct info_forward_s {
-} info_forward_t;
-int parse_info_forward(void *buf, int16_t extra_data_length, void *data);
-
-typedef struct {
-   int16_t extra_data_type;
-   int16_t extra_data_length;
-   EDP *parse_handler;
-} parse_handler_t;
-
+slave_info_t *get_slave_info();
 #endif

@@ -20,4 +20,8 @@ struct client_data_s {
 
 typedef struct client_data_s client_data_t;
 
+void accept_client_timeout(cycle_t *cycle, struct timer_s *timer,
+        void* data);
+void accept_client_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data);
+
 #endif

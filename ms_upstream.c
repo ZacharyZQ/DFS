@@ -1,6 +1,6 @@
 #include "dfs_head.h"
-void process_upstream_reply(ud) {
-    cycle_close(ud->fde);
+void process_upstream_reply(cycle_t *cycle, upstream_data_t *ud) {
+    cycle_close(cycle, ud->fde);
     ud->fde = NULL;
     ud->operation_callback(ud, 0);
 }
@@ -105,7 +105,7 @@ void recv_upstream_reply_callback(cycle_t *cycle, fd_entry_t *fde, void* data) {
                     recv_upstream_reply_callback, ud);
             return ;
         } else {
-            process_upstream_reply(ud);
+            process_upstream_reply(cycle, ud);
             return ;
         }
     }
@@ -115,8 +115,8 @@ void send_upstream_request_timeout(struct cycle_s *cycle, struct timer_s *timer,
         void *data)
 {
     upstream_data_t *ud = (upstream_data_t *)data;
-    log(LOG_DEBUG, "fd is %d\n", upstream_data_t->fde->fd);
-    cycle_close(cycle, fde);
+    log(LOG_DEBUG, "fd is %d\n", ud->fde->fd);
+    cycle_close(cycle, ud->fde);
     ud->fde = NULL;
     ud->operation_callback(ud, -1);
 }
@@ -138,7 +138,7 @@ void send_upstream_request_callback(struct cycle_s *cycle, struct fd_entry_s *fd
 void connect_server_callback(struct cycle_s *cycle, struct fd_entry_s *fde,
         int status, struct in_addr in_addr, int port, void* data)
 {
-    upstream_data_t *ud = (upstream_data_t *ud)data;
+    upstream_data_t *ud = (upstream_data_t *)data;
     if (status != CYCLE_OK) {
         log(LOG_DEBUG, "connect error");
         //when connect error, the fde had closed by cycle_connect
@@ -148,8 +148,16 @@ void connect_server_callback(struct cycle_s *cycle, struct fd_entry_s *fde,
         return;
     }
     log(LOG_DEBUG, "connect success fd is %d\n", fde->fd);
-    char *buf = strdup("hello, I am slave\n");
-    int size = strlen(buf);
+    char *buf = calloc(1, 2 * 1048576);
+    memcpy(buf, &ud->head, sizeof(ms_context_t));
+    if (ud->head.extra_length != 0) {
+        memcpy(buf + sizeof(ms_context_t), ud->extra_buf, ud->head.extra_length);
+    }   
+    if (ud->head.content_length != 0) {
+        memcpy(buf + sizeof(ms_context_t) + ud->head.extra_length,
+                ud->content_buf, ud->head.content_length);
+    }   
+    int size = sizeof(ms_context_t) + ud->head.extra_length + ud->head.content_length;
     cycle_set_timeout(cycle, &fde->timer, 5 * 1000, send_upstream_request_timeout, ud);
     cycle_write(cycle, fde, buf, size, 2 * 1048576, send_upstream_request_callback, ud);
 }
@@ -166,35 +174,41 @@ void ud_destory(upstream_data_t *ud) {
     if (ud->extra_buf) {
         free(ud->extra_buf);
     }
-    if (ud->send_buf.buf) {
-        mem_buf_clean(&ud->send_buf);
+    if (ud->recv_buf.buf) {
+        mem_buf_clean(&ud->recv_buf);
     }
     free(ud);
 }
 
-void slave_register(char *hostname) {
+void slave_register_callback(upstream_data_t *ud, int status); 
+
+void slave_register(cycle_t *cycle) {
+    log(LOG_RUN_ERROR, "slave begin register\n");
     upstream_data_t *ud = ud_init();
     ud->head.method = S_METHOD_REG;
     ud->head.slave_id = 0;
-    ud->head.extra_length = sizeof(disk_info_t);
-    ud->head.extra_data_type = ED_DISK_INFO;
+    //page_num
     ud->head.content_length = 0;
-    ud->extra_buf = calloc(1, sizeof(disk_info_t));
     ud->operation_callback = slave_register_callback;
-    get_disk_info(ud->extra_buf);
+    ud->head.extra_length = sizeof(slave_info_t);
+    ud->extra_buf = (slave_info_t *)get_slave_info();
     struct in_addr ia;
     fd_entry_t *fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
             1048576 * 2, 1048576 * 2);
     safe_inet_addr("127.0.0.1", &ia);
+    ud->fde = fde;
+    mem_buf_def_init(&ud->recv_buf);
     cycle_connect(cycle, fde, ia, 38888, 3, connect_server_callback, ud);
 }
-
+extern int g_slave_id;
 void slave_register_callback(upstream_data_t *ud, int status) {
+    log(LOG_RUN_ERROR, "slave end register, status %d\n", status);
     if (status != 0) {
-        log(LOG_RUN_ERROR, "register error\n")
+        log(LOG_RUN_ERROR, "register error\n");
         assert(0);
         return ;
     }
+    g_slave_id = ud->head.slave_id;
     log(LOG_RUN_ERROR, "register success, the slave id is %hd\n",
             ud->head.slave_id);
     ud_destory(ud);

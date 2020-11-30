@@ -3,7 +3,7 @@
 
 struct upstream_data_s;
 
-typedef void OCB(struct upstream_data_s, int status);
+typedef void OCB(struct upstream_data_s *, int status);
 
 typedef struct upstream_data_s {
     ms_context_t head;
@@ -15,4 +15,5 @@ typedef struct upstream_data_s {
     OCB *operation_callback;
 } upstream_data_t;
 
+void slave_register(cycle_t *cycle);
 #endif

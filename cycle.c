@@ -766,12 +766,11 @@ void cycle_connect_callback(cycle_t* cycle, cycle_connect_state_t* cs, int statu
         cycle_close(cycle, fde);
     }
 #endif
-    if (data == NULL) {
-        callback(cycle, status == CYCLE_OK ? fde : NULL,
-                status, in_addr, port, data);
-    } else if (status == CYCLE_OK) {
+    if (status != CYCLE_OK) {
         cycle_close(cycle, fde);
     }
+    callback(cycle, status == CYCLE_OK ? fde : NULL,
+            status, in_addr, port, data);
 
     //drd_cbdata_unlock(data);
 }
@@ -839,6 +838,7 @@ static void cycle_connect_handle(cycle_t* cycle, fd_entry_t* fde, void* data) {
 
 static void cycle_connect_timeout(cycle_t* cycle, struct timer_s* timer, void* data) {
     cycle_connect_state_t* cs = (cycle_connect_state_t*)data;
+    log(LOG_RUN_ERROR, "fd %d\n", cs->fde->fd);
     cycle_close(cycle, cs->fde);
     cycle_connect_callback(cycle, cs, CYCLE_ERR_CONNECT);
 }

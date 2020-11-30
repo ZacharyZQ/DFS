@@ -1,5 +1,6 @@
 #ifndef __DFS_HEAD_H
 #define __DFS_HEAD_H
+#include <stddef.h>
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -27,4 +28,6 @@
 #include "ms_client.h"
 #include "ms_upstream.h"
 #include "name_node.h"
+#include "fs.h"
+#include "master.h"
 #endif
