@@ -16,6 +16,7 @@
 #include <assert.h>
 #include <fcntl.h>
 #include <netinet/in.h>
+#include <ctype.h>
 #include "cycle.h"
 #include "dir_tree.h"
 #include "epoll.h"

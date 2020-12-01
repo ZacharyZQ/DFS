@@ -19,9 +19,11 @@ void master_process_slave_register(client_data_t *cd) {
     cd->head.extra_length = 0;
     cd->head.method = METHOD_ACK;
     cd->head.slave_id = (int16_t)i;
+    slave_group[i] = d;
     assert(!cd->content_buf);
     assert(!cd->head.content_length);
-    log(LOG_RUN_ERROR, "the alloc slave id is %hd\n", d->slave_id);
+    log(LOG_RUN_ERROR, "the alloc slave id is %hd, slave name is %s\n",
+            d->slave_id, d->slave_name);
 }
 
 void master_process_slave_unregister(client_data_t *cd) {
