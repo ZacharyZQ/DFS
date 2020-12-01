@@ -24,10 +24,11 @@ typedef struct file_entry_s {
 #pragma pack()
 
 void name_node_init();
-int create_dir_name_node(char *path);
-int create_file_name_node(char *path);
-int remove_dir_name_node(char *path);
-int remove_file_name_node(char *path);
+int check_path_name_valid(char *path);
+int create_dir(char *path);
+int create_file(char *path);
+int remove_dir(char *path);
+int remove_file(char *path);
 
 
 //the map_reduce_ops is phony Map-Reduce, it can't make slave do some calculation.

@@ -17,4 +17,6 @@ typedef struct {
 slave_info_t* slave_group[MAX_SLAVE];
 
 void master_init();
+
+extern master_t master;
 #endif

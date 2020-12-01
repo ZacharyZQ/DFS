@@ -54,6 +54,7 @@ static char* trim_string(char* str) {
 #define ADMIN_COMMANDER_MVToLocal (uint8_t)6
 #define ADMIN_COMMANDER_STATUS (uint8_t)7
 #define ADMIN_COMMANDER_QUERY (uint8_t)8
+#define ADMIN_COMMANDER_DATANODE_INFO (uint8_t)9
 
 
 #define w_space " \t"
@@ -83,6 +84,8 @@ int parse_admin_request(admin_data_t *ad, char *buf, int size) {
         method = ADMIN_COMMANDER_STATUS;
     } else if (!strcmp(token, "query")) {
         method = ADMIN_COMMANDER_QUERY;
+    } else if (!strcmp(token, "DataNodeInfo")) {
+        method = ADMIN_COMMANDER_DATANODE_INFO;
     }
     if (method == 0) {
         ad->reply = strdup("unrecognize method\n");
@@ -92,6 +95,7 @@ int parse_admin_request(admin_data_t *ad, char *buf, int size) {
     switch(method) {
     //no parameter
     case ADMIN_COMMANDER_STATUS:
+    case ADMIN_COMMANDER_DATANODE_INFO:
         break;
     //one parameter
     case ADMIN_COMMANDER_QUERY :
@@ -140,16 +144,68 @@ FAILED:
     return -1;
 }
 
+void admin_process_datanode_info(admin_data_t *ad) {
+    mem_buf_t mb;
+    mem_buf_def_init(&mb);
+    dir_tree_printf(master.tree->root, &mb, 1, 1);
+    ad->reply = mb.buf;
+}
+
 void admin_process_status(admin_data_t *ad) {
+    int i;
+    mem_buf_t mb;
+    mem_buf_def_init(&mb);
+    mem_buf_printf(&mb, "DFS\n");
+    mem_buf_printf(&mb, "pid: %d\n", getpid());
+    mem_buf_printf(&mb, "\n%-30s%-20s%-20s%-20s%-20s\n",
+            "slave name", "slave id", "status", "total page num", "free page num");
+    for (i = 1; i < MAX_SLAVE; i ++) {
+        if (slave_group[i]) {
+            mem_buf_printf(&mb, "%-30s%-20hu%-20s%-20u%-20u\n",
+                    slave_group[i]->slave_name, slave_group[i]->slave_id,
+                    (slave_group[i]->is_online) ? "online" : "offline",
+                    slave_group[i]->total_page_num, slave_group[i]->free_page_num);
+        }
+    }
+    ad->reply = mb.buf;
 }
 
 void admin_process_query(admin_data_t *ad) {
 }
 
 void admin_process_ls(admin_data_t *ad) {
+    mem_buf_t mb;
+    if (!check_path_name_valid(ad->source_file)) {
+        ad->reply = strdup("path name invalid\n");
+    }
+    dirtree_node_t *node = dir_tree_search(master.tree, ad->source_file);
+    if (node == NULL) {
+        ad->reply = strdup("path not exist\n");
+    } else {
+        mem_buf_def_init(&mb);
+        dir_tree_printf(node, &mb, 0, 0);
+        ad->reply = mb.buf;
+    }
 }
 
 void admin_process_mkdir(admin_data_t *ad) {
+    int ret;
+    if ((ret = create_dir(ad->source_file)) == 0) {
+        return ;
+    }
+    switch (ret) {
+    case 0:
+        return;
+    case -1:
+        ad->reply = strdup("path name invalid\n");
+        return;
+    case -2:
+        ad->reply = strdup("path existed\n");
+        return;
+    default:
+        break;
+    }
+    return ;
 }
 
 void admin_process_rmdir(admin_data_t *ad) {
@@ -166,6 +222,9 @@ void admin_process_mvToLocal(admin_data_t *ad) {
 
 void process_admin_request(cycle_t *cycle, admin_data_t *ad) {
     switch(ad->admin_method) {
+    case ADMIN_COMMANDER_DATANODE_INFO:
+        admin_process_datanode_info(ad);
+        break;
     case ADMIN_COMMANDER_STATUS:
         admin_process_status(ad);
         break;
@@ -197,7 +256,9 @@ void process_admin_request(cycle_t *cycle, admin_data_t *ad) {
         return;
     }
     if (ad->reply == NULL) {
-        ad->reply = strdup("test ok\n");
+        cycle_close(cycle, ad->fde);
+        ad_destory(ad);
+        return ;
     }
     cycle_set_timeout(cycle, &ad->fde->timer, 5 * 1000,
             send_admin_reply_timeout, ad);
@@ -240,7 +301,7 @@ void send_admin_reply_done(struct cycle_s *cycle, struct fd_entry_s *fde, ssize_
 }
 
 void read_admin_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
-    char buf[1048576 * 2];
+    char buf[1048576 * 2] = {0};
     ssize_t size = read(fde->fd, buf, sizeof(buf));
     log(LOG_DEBUG, "read %ld bytes from fd %d\n", size, fde->fd);
     if (size < 0) {
@@ -308,6 +369,7 @@ void accept_admin_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
 int main () {
     log_init("log/master.log");
     log(LOG_RUN_ERROR, "master start\n");
+    master_init();
     cycle_t *cycle = init_cycle();
     struct in_addr ia; 
     ia.s_addr = INADDR_ANY;

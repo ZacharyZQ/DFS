@@ -1,9 +1,6 @@
-#include <stdlib.h>
-#if 0
+#include "dfs_head.h"
+master_t master;
 void master_init() {
-    master.tree = dir_tree_init();
+    master.tree = dir_tree_init(1);
 }
-int main() {
-}
-#endif
 

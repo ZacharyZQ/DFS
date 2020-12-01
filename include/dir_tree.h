@@ -40,8 +40,16 @@ dir_tree_t *dir_tree_init(int is_rebuild);
 void dir_tree_destory(dir_tree_t *tree);
 void dir_tree_insert_to_root(dir_tree_t *tree, dirtree_node_t *node);
 void dir_tree_insert(dirtree_node_t *parent, dirtree_node_t *node);
-void dir_tree_delete(dirtree_node_t *node);
+void dir_tree_delete(dir_tree_t *tree, dirtree_node_t *node);
 void dir_tree_delete_recursive(dirtree_node_t *node);
+void dir_tree_insert(dirtree_node_t *parent, dirtree_node_t *node);
+void dir_tree_delete(dir_tree_t *tree, dirtree_node_t *node);
+void print_node_path(dirtree_node_t *node, mem_buf_t *mem_buf);
+void dir_tree_printf(dirtree_node_t *node, mem_buf_t *mem_buf,
+        int print_self, int recursion);
+dirtree_node_t *dir_tree_search(dir_tree_t *tree, char *path);
+
+
 
 
 #endif
