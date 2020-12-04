@@ -4,6 +4,7 @@
 typedef struct {
     cycle_t *t;
     dir_tree_t *tree;
+    hash_table *block_location_ht;
 } master_t;
 
 typedef struct {

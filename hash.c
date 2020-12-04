@@ -134,3 +134,7 @@ unsigned int hash_md5key(const void* data, unsigned int size) {
 int int_key_cmp(const void* str1, const void* str2) {
     return memcmp(str1, str2, sizeof(int));
 }
+
+int md5_cmp(const void* str1, const void* str2) {
+    return memcmp(str1, str2, 16);
+}

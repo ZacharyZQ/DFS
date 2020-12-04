@@ -21,8 +21,8 @@ void dir_tree_destory(dir_tree_t * tree) {
 void dir_tree_insert(dirtree_node_t *parent, dirtree_node_t *node) {
     node->parent_node = parent;
     list_add(&node->sibling_node, &parent->child_node);
-    log(LOG_DEBUG, "parent name %s %p, name %s %p\n",
-            parent->obj.dir_info.name, parent, node->obj.dir_info.name, node);
+    //log(LOG_DEBUG, "parent name %s %p, name %s %p\n",
+    //        parent->obj.dir_info.name, parent, node->obj.dir_info.name, node);
     //if (node->type == T_FILE) {
     //
     //}
@@ -83,6 +83,50 @@ void dir_tree_printf(dirtree_node_t *node, mem_buf_t *mem_buf,
             mem_buf_printf(mem_buf, "\n");
         }
     }
+}
+
+dirtree_node_t *dir_tree_search_file(dir_tree_t *tree, char *path) {
+    if (!check_path_name_valid(path)) {
+        return NULL;
+    }
+    dirtree_node_t *ret = NULL;
+    dirtree_node_t *temp = NULL;
+    struct list_head *p_list_head;
+    int len = strlen(path);
+    if (path[len - 1] == '/') {
+        return NULL;
+    }
+    char *dir_path = strdup(path);
+    char *dir;
+    int i;
+    for (i = len - 1; i >= 0; i --) {
+        if (path[i] == '/') {
+            dir_path[i] = 0;
+            break;
+        }
+    }
+    if (i == 0) {
+        dir = "/";
+    } else {
+        dir = dir_path;
+    }
+    dirtree_node_t *parent_path_node = dir_tree_search(tree, dir);
+    char *file_name;
+    if (parent_path_node == NULL) {
+        ret = NULL;
+        goto FINISH;
+    }
+    file_name = dir_path + i + 1;
+    list_for_each(p_list_head, &parent_path_node->child_node) {
+        temp = list_entry(p_list_head, dirtree_node_t, sibling_node);
+        if (temp->type == T_FILE && !strcmp(temp->obj.dir_info.name, file_name)) {
+            ret = temp;
+            break;
+        }
+    }
+FINISH:
+    free(dir_path);
+    return ret;
 }
 
 dirtree_node_t *dir_tree_search(dir_tree_t *tree, char *path) {

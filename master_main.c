@@ -84,7 +84,7 @@ int parse_admin_request(admin_data_t *ad, char *buf, int size) {
         method = ADMIN_COMMANDER_STATUS;
     } else if (!strcmp(token, "query")) {
         method = ADMIN_COMMANDER_QUERY;
-    } else if (!strcmp(token, "DataNodeInfo")) {
+    } else if (!strcmp(token, "NameNodeInfo")) {
         method = ADMIN_COMMANDER_DATANODE_INFO;
     }
     if (method == 0) {
@@ -209,6 +209,7 @@ void admin_process_mkdir(admin_data_t *ad) {
 }
 
 void admin_process_rmdir(admin_data_t *ad) {
+    
 }
 
 void admin_process_rm(admin_data_t *ad) {

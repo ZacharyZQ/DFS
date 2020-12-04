@@ -37,4 +37,5 @@ extern void hash_free_memory(hash_table*);
 extern HASHHASH hash_string;
 extern HASHHASH hash_md5key;
 int int_key_cmp(const void* str1, const void* str2);
+int md5_cmp(const void* str1, const void* str2);
 #endif
