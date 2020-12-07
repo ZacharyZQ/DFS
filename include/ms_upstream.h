@@ -13,7 +13,11 @@ typedef struct upstream_data_s {
     mem_buf_t recv_buf;
     int recv_stage;
     OCB *operation_callback;
+    void *callback;
+    void *data;
 } upstream_data_t;
 
 void slave_register(cycle_t *cycle);
+void master_distribute_block(cycle_t *cycle, unsigned char *key, int16_t slave_id, int32_t content_length,
+        void *content_buf, void *callback, void *data);
 #endif

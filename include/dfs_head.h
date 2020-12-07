@@ -17,6 +17,7 @@
 #include <fcntl.h>
 #include <netinet/in.h>
 #include <ctype.h>
+#include <pthread.h>
 #include "cycle.h"
 #include "dir_tree.h"
 #include "epoll.h"
@@ -31,4 +32,8 @@
 #include "name_node.h"
 #include "fs.h"
 #include "master.h"
+#include "io_thread.h"
+
+#define _GNU_SOURCE
+#define BACK_UP_COUNT 2
 #endif

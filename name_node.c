@@ -73,6 +73,54 @@ int create_dir(char *path) {
     return 0;
 }
 
+int create_file(char *path, uint32_t content_length) {
+    if (!check_path_name_valid(path)) {
+        return -1;
+    }   
+    int name_len = strlen(path);
+    if (path[name_len - 1] == '/') {
+        return -2;
+    }   
+    char *file_name = strdup(path);
+    char *file_path = strdup(path);
+    dirtree_node_t *file_node;
+    dirtree_node_t *file_path_node;
+    int ret;
+    int i;
+    for (i = name_len - 1; i >= 0; i --) {
+        if (path[i] == '/') {
+            file_path[i + 1] = 0;
+            memset(file_name, 0, name_len + 1);
+            memcpy(file_name, path + i + 1, name_len - i);
+            break;
+        }
+    }
+    file_node = dir_tree_search_file(master.tree, path);
+    if (file_node) {
+        ret = -3;
+        goto FINISH;
+    }
+    file_path_node = dir_tree_search(master.tree, file_path);
+    if (!file_path_node) {
+        ret = -4;
+        goto FINISH;
+    }
+
+    file_node = master.tree->alloc_ops->alloc_root_node();
+    file_node->type = T_FILE;
+    file_node->parent_node = file_path_node;
+    list_head_init(&file_node->child_node);
+    list_head_init(&file_node->sibling_node);
+    memcpy(file_node->obj.file_info.name, file_name, strlen(file_name));
+    file_node->obj.file_info.content_length = content_length;
+    dir_tree_insert(file_path_node, file_node);
+    ret = 0;
+FINISH:
+    free(file_name);
+    free(file_path);
+    return ret;
+}
+
 
 void *MR_lfs_default_init();
 int MR_lfs_default_map(void *private_data, char *buf, int size);

@@ -1,6 +1,41 @@
 #include "dfs_head.h"
 void client_data_destory(client_data_t *cd);
 
+void slave_process_create_block(client_data_t *cd) {
+    char *file_name = calloc(1, 200);
+    strcpy(file_name, "./block/");
+    char *key_text = file_name + strlen("./block/");
+    md5_expand(cd->head.key, key_text);
+    log(LOG_DEBUG, "key text is %s, filename is %s\n", key_text, file_name);
+    FILE *fp = fopen(file_name, "w+");
+    if (!fp) {
+        log(LOG_RUN_ERROR, "filename %s open failed\n", file_name);
+        cd->head.method = METHOD_ACK_FAILED;
+        cd->head.content_length = 0;
+        free(cd->content_buf);
+        cd->content_buf = NULL;
+        if (cd->extra_buf) {
+            free(cd->extra_buf);
+            cd->extra_buf = NULL;
+        }
+        cd->head.extra_length = 0;
+        free(file_name);
+        return ;
+    }
+    fwrite(cd->content_buf, cd->head.content_length, 1, fp);
+    cd->head.method = METHOD_ACK_SUCC;
+    cd->head.content_length = 0;
+    free(cd->content_buf);
+    cd->content_buf = NULL;
+    if (cd->extra_buf) {
+        free(cd->extra_buf);
+        cd->extra_buf = NULL;
+    }
+    cd->head.extra_length = 0;
+    fclose(fp);
+    log(LOG_DEBUG, "process succ %s\n", file_name);
+    free(file_name);
+}
 
 void master_process_slave_register(client_data_t *cd) {
     int i = 0;
@@ -17,7 +52,7 @@ void master_process_slave_register(client_data_t *cd) {
     d->slave_id = (int16_t)i;
     cd->extra_buf = NULL;
     cd->head.extra_length = 0;
-    cd->head.method = METHOD_ACK;
+    cd->head.method = METHOD_ACK_SUCC;
     cd->head.slave_id = (int16_t)i;
     slave_group[i] = d;
     assert(!cd->content_buf);
@@ -51,6 +86,7 @@ void send_client_reply_timeout(cycle_t *cycle, struct timer_s *timer, void* data
 void process_client_request(cycle_t *cycle, client_data_t *cd) {
     switch (cd->head.method) {
     case M_METHOD_CREATE:
+        slave_process_create_block(cd);
         break;
     case M_METHOD_DELETE:
     case M_METHOD_QUERY:
@@ -63,7 +99,7 @@ void process_client_request(cycle_t *cycle, client_data_t *cd) {
     default:
         assert(0);
     }
-    assert(cd->head.method == METHOD_ACK);
+    assert(cd->head.method == METHOD_ACK_SUCC || cd->head.method == METHOD_ACK_FAILED);
     char *buf = calloc(1, 2 * 1048576);
     memcpy(buf, &cd->head, sizeof(ms_context_t));
     if (cd->head.extra_length != 0) {

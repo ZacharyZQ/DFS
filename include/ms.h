@@ -8,7 +8,8 @@
 #define S_METHOD_REG    ((uint16_t)4)
 #define S_METHOD_INFO   ((uint16_t)5)
 #define S_METHOD_UNREG  ((uint16_t)6)
-#define METHOD_ACK      ((uint16_t)7)
+#define METHOD_ACK_SUCC ((uint16_t)7)
+#define METHOD_ACK_FAILED ((uint16_t)8)
 
 #define PAGE_SIZE  (1 << 12)
 #define BLOCK_SIZE (1 << 20)
@@ -25,8 +26,7 @@ struct ms_context_s {
     int16_t slave_id;
     int16_t extra_length;
     int16_t extra_data_type;
-    int16_t content_length;
-    unsigned char padding[2];
+    int32_t content_length;
     unsigned char key[16];
 };
 #pragma pack()

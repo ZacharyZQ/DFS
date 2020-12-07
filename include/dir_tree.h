@@ -48,6 +48,7 @@ void print_node_path(dirtree_node_t *node, mem_buf_t *mem_buf);
 void dir_tree_printf(dirtree_node_t *node, mem_buf_t *mem_buf,
         int print_self, int recursion);
 dirtree_node_t *dir_tree_search(dir_tree_t *tree, char *path);
+dirtree_node_t *dir_tree_search_file(dir_tree_t *tree, char *path);
 
 
 

@@ -4,22 +4,18 @@ void send_admin_reply_timeout(cycle_t *cycle, struct timer_s *timer,
         void* data);
 void send_admin_reply_done(struct cycle_s *cycle, struct fd_entry_s *fde, ssize_t size,
         int flag, void* data);
-typedef struct {
-    fd_entry_t *fde;
-    uint8_t admin_method;
-    char *source_file;
-    char *dest_file;
-    char *reply;
-    uint8_t async_callback;
-} admin_data_t;
 
 admin_data_t *ad_init(fd_entry_t *fde) {
     admin_data_t *ad = calloc(1, sizeof(admin_data_t));
     ad->fde = fde;
+    ad->fd = -1;
     return ad;
 }
 
 void ad_destory(admin_data_t *ad) {
+    if (ad->map_block) {
+        free(ad->map_block);
+    }
     if (ad->source_file) {
         free(ad->source_file);
     }
@@ -28,6 +24,12 @@ void ad_destory(admin_data_t *ad) {
     }
     if (ad->reply) {
         free(ad->reply);
+    }
+    if (ad->fd >= 0) {
+        close(ad->fd);
+    }
+    if (ad->fp) {
+        fclose(ad->fp);
     }
     free(ad);
 }
@@ -127,7 +129,7 @@ int parse_admin_request(admin_data_t *ad, char *buf, int size) {
             goto FAILED;
         }
         token = trim_string(token);
-        ad->source_file = strdup(token);
+        ad->dest_file = strdup(token);
         break;
     default:
         assert(0);
@@ -215,7 +217,148 @@ void admin_process_rmdir(admin_data_t *ad) {
 void admin_process_rm(admin_data_t *ad) {
 }
 
+void admin_process_mvFromLocal_done(admin_data_t *ad, int status, int block_id) {
+    if (status == 0) {
+        ad->map_block[block_id] = 1;
+    } else {
+        ad->map_block[block_id] = 2;
+    }
+    int i;
+    int all_succ = 1;
+    int all_finish = 1;
+    for (i = 0; i < ad->block_num; i ++) {
+        if (ad->map_block[i] == 0) {
+            all_finish = 0;
+        }
+        if (ad->map_block[i] == 2) {
+            all_succ = 0;
+        }
+    }
+    if (all_succ && all_finish) {
+        cycle_close(master.cycle, ad->fde);
+        ad_destory(ad);
+        return ;
+    } else if (all_finish) {
+        ad->reply = strdup("mvFromLocal failed\n");
+        cycle_set_timeout(master.cycle, &ad->fde->timer, 5 * 1000,
+                send_admin_reply_timeout, ad);
+        cycle_write(master.cycle, ad->fde, strdup(ad->reply), strlen(ad->reply),
+                2 * 1048576, send_admin_reply_done, ad);
+    }
+}
+
 void admin_process_mvFromLocal(admin_data_t *ad) {
+    int fd = open(ad->source_file, O_RDONLY);
+    FILE *fp = fdopen(fd, "r");
+    ad->fd = fd;
+    ad->fp = fp;
+    ssize_t file_size;
+    int ret;
+    int16_t block_num;
+    int16_t i;
+    int j;
+    int16_t base;
+    int max_current_slave;
+    block_t *bt_array;
+    block_t *bt;
+    uint8_t *slave_flag1;
+    uint8_t *slave_flag2;
+    int find_slave_num = 0;
+    int cursor;
+    int io_id;
+    for (i = 1; i < MAX_SLAVE; i ++) {
+        if (slave_group[i] == NULL) {
+            max_current_slave = i;
+            break;
+        }
+    }
+    if (max_current_slave == 1) {
+        ad->reply = strdup("no slave\n");
+        goto FINISH;
+    }
+    slave_flag1 = calloc(max_current_slave, sizeof(uint8_t));
+    slave_flag2 = calloc(max_current_slave, sizeof(uint8_t));
+    for (i = 1; i < max_current_slave; i ++) {
+        if (!slave_group[i]->is_online) {
+            slave_flag1[i] = 1;
+        }
+    }
+    slave_flag1[0] = 1;
+    if (fd < 0 || !fp) {
+        ad->reply = strdup("file can't open, please check file name\n");
+        log(LOG_RUN_ERROR, "%s %s", ad->reply, ad->source_file);
+        goto FINISH;
+    }
+    file_size = lseek(fd, 0, SEEK_END);
+    if (file_size <= 0) {
+        ad->reply = strdup("file size <= 0, illegal\n");
+        goto FINISH;
+    }
+    block_num = file_size / BLOCK_SIZE;
+    if (file_size % BLOCK_SIZE > 0) {
+        block_num ++;
+    }
+    ad->block_num = block_num;
+    ret = create_file(ad->dest_file, file_size);
+    switch(ret) {
+    case -1:
+        ad->reply = strdup("file name invalid\n");
+        goto FINISH;
+        break;
+    case -2:
+        ad->reply = strdup("file name end char is /, that is illegal\n");
+        goto FINISH;
+        break;
+    case -3:
+        ad->reply = strdup("file existed\n");
+        goto FINISH;
+        break;
+    case -4:
+        ad->reply = strdup("dest path is not existed\n");
+        goto FINISH;
+        break;
+    default:
+        break;
+    }
+    bt_array = (block_t *)calloc(block_num, sizeof(block_t));
+    ad->map_block = (int8_t *)calloc(block_num, sizeof(int8_t));
+    for (i = 0; i < block_num; i ++) {
+        memcpy(slave_flag2, slave_flag1, max_current_slave * sizeof(uint8_t));
+        bt = &bt_array[i];
+        //base = rand() % max_current_slave;
+        md5_context M;
+        md5_init(&M);
+        md5_update(&M, ad->dest_file, strlen(ad->dest_file)); //file name
+        md5_update(&M, &i, sizeof(i)); //part index
+        //md5_update(&M, &base, sizeof(base)); //slave info
+        md5_final(bt->key, &M);
+        base = hash_md5key(bt->key, max_current_slave);
+        cursor = base;
+        find_slave_num = 0;
+        for (j = 0; find_slave_num <= 1 + max_current_slave && j < BACK_UP_COUNT;
+                find_slave_num ++)
+        {
+            if (slave_flag2[cursor] == 0) {
+                bt->store_slave_id[j] = cursor;
+                slave_flag2[cursor] = 1;
+                j ++;
+            }
+            cursor = (cursor + 1) % max_current_slave;
+        }
+        io_id = rand() % IO_THREAD_NUM;
+        main_distribute_block(master.cycle, io_id, i, fd, i * BLOCK_SIZE,
+                (i < block_num - 1) ? BLOCK_SIZE : (file_size % BLOCK_SIZE), bt,
+                admin_process_mvFromLocal_done, ad);
+        //every block has its own io thread
+    }
+    ad->async_callback = 1;
+FINISH:
+    if (slave_flag1) {
+        free(slave_flag1);
+    }
+    if (slave_flag2) {
+        free(slave_flag2);
+    }
 }
 
 void admin_process_mvToLocal(admin_data_t *ad) {
@@ -366,12 +509,13 @@ void accept_admin_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
     cycle_set_event(cycle, listen_fde, CYCLE_READ_EVENT, accept_admin_handler, NULL);
 }
 
-
 int main () {
     log_init("log/master.log");
     log(LOG_RUN_ERROR, "master start\n");
     master_init();
     cycle_t *cycle = init_cycle();
+    master.cycle = cycle;
+    io_thread_init(cycle);
     struct in_addr ia; 
     ia.s_addr = INADDR_ANY;
     int listen_fd = open_listen_fd(
@@ -381,7 +525,6 @@ int main () {
     cycle_listen(cycle, listen_fde);
     cycle_set_timeout(cycle, &listen_fde->timer, 1000, accept_client_timeout, NULL);
     cycle_set_event(cycle, listen_fde, CYCLE_READ_EVENT, accept_client_handler, NULL);
-
 
     int admin_fd = open_listen_fd(
             CYCLE_NONBLOCKING | CYCLE_REUSEADDR,

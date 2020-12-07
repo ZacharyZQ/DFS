@@ -1,5 +1,4 @@
 #include "dfs_head.h"
-char hostname[16];
 int main () {
     log_init("log/slave.log");
     log(LOG_RUN_ERROR, "slave start\n");

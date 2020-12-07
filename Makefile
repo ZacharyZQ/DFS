@@ -1,7 +1,7 @@
 CC = gcc
 LINK = $(CC)
 CFLAGS = -Wall -Werror -g -I./include
-LDFLAGS = 
+LDFLAGS = -pthread
 SOURCES = $(wildcard *.c) $(wildcard fs/*.c)
 EX_MAIN_SOURCES = $(filter-out test.c slave_main.c master_main.c, $(SOURCES))
 EX_MAIN_OBJS = $(patsubst %.c,%.o,$(EX_MAIN_SOURCES))

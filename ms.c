@@ -1,5 +1,11 @@
 #include "dfs_head.h"
-int check_ms_context(ms_context_t * a) {
+int check_ms_context(ms_context_t *a) {
+    if (a->method < 1 || a->method > 8) {
+        log(LOG_RUN_ERROR, "implement method\n");
+    }
+    if (a->slave_id < 0 || a->slave_id > MAX_SLAVE) {
+        log(LOG_RUN_ERROR, "invalid slave id\n");
+    }
     return 0;
 }
 
