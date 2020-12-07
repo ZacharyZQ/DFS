@@ -261,11 +261,12 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
     int max_current_slave;
     block_t *bt_array;
     block_t *bt;
-    uint8_t *slave_flag1;
-    uint8_t *slave_flag2;
+    uint8_t *slave_flag1 = NULL;
+    uint8_t *slave_flag2 = NULL;
     int find_slave_num = 0;
     int cursor;
     int io_id;
+    int block_length = 0;
     for (i = 1; i < MAX_SLAVE; i ++) {
         if (slave_group[i] == NULL) {
             max_current_slave = i;
@@ -323,6 +324,15 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
     bt_array = (block_t *)calloc(block_num, sizeof(block_t));
     ad->map_block = (int8_t *)calloc(block_num, sizeof(int8_t));
     for (i = 0; i < block_num; i ++) {
+        if (i == block_num - 1) {
+            if (file_size % BLOCK_SIZE == 0) {
+                block_length = BLOCK_SIZE;
+            } else {
+                block_length = file_size % BLOCK_SIZE;
+            }
+        } else {
+            block_length = BLOCK_SIZE;
+        }
         memcpy(slave_flag2, slave_flag1, max_current_slave * sizeof(uint8_t));
         bt = &bt_array[i];
         //base = rand() % max_current_slave;
@@ -347,7 +357,7 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
         }
         io_id = rand() % IO_THREAD_NUM;
         main_distribute_block(master.cycle, io_id, i, fd, i * BLOCK_SIZE,
-                (i < block_num - 1) ? BLOCK_SIZE : (file_size % BLOCK_SIZE), bt,
+                block_length, bt,
                 admin_process_mvFromLocal_done, ad);
         //every block has its own io thread
     }

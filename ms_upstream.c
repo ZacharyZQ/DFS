@@ -31,7 +31,7 @@ int parse_upstream_reply(upstream_data_t *ud, char *buf, int size) {
         {
             ud->recv_stage = RECV_DONE;
         } else {
-            break;
+            return 1;
         }
     case RECV_DONE:
         if (ud->head.extra_length > 0) {
@@ -106,6 +106,8 @@ void recv_upstream_reply_callback(cycle_t *cycle, fd_entry_t *fde, void* data) {
                     recv_upstream_reply_callback, ud);
             return ;
         } else {
+            log(LOG_DEBUG, "parse succ, method %hu extra_length %hu content_length %d\n",
+                    ud->head.method, ud->head.extra_length, ud->head.content_length);
             process_upstream_reply(cycle, ud);
             return ;
         }
@@ -131,7 +133,9 @@ void send_upstream_request_callback(struct cycle_s *cycle, struct fd_entry_s *fd
         cycle_close(cycle, fde);
         ud->fde = NULL;
         ud->operation_callback(ud, -1);
+        return ;
     }
+    log(LOG_DEBUG, "send succ\n");
     cycle_set_timeout(cycle, &fde->timer, 5 * 1000, recv_upstream_reply_timeout, ud);
     cycle_set_event(cycle, fde, CYCLE_READ_EVENT, recv_upstream_reply_callback, ud);
 }
@@ -158,6 +162,9 @@ void connect_server_callback(struct cycle_s *cycle, struct fd_entry_s *fde,
         memcpy(buf + sizeof(ms_context_t) + ud->head.extra_length,
                 ud->content_buf, ud->head.content_length);
     }
+    int size = sizeof(ms_context_t) + ud->head.extra_length + ud->head.content_length;
+    log(LOG_DEBUG, "send head, method %hu extra_length %hu content_length %d, send size %d\n",
+            ud->head.method, ud->head.extra_length, ud->head.content_length, size);
     if (ud->extra_buf) {
         free(ud->extra_buf);
         ud->extra_buf = NULL;
@@ -166,7 +173,6 @@ void connect_server_callback(struct cycle_s *cycle, struct fd_entry_s *fde,
         free(ud->content_buf);
         ud->content_buf = NULL;
     }
-    int size = sizeof(ms_context_t) + ud->head.extra_length + ud->head.content_length;
     cycle_set_timeout(cycle, &fde->timer, 5 * 1000, send_upstream_request_timeout, ud);
     cycle_write(cycle, fde, buf, size, 2 * 1048576, send_upstream_request_callback, ud);
 }
@@ -245,6 +251,7 @@ void master_distribute_block(cycle_t *cycle, unsigned char *key, int16_t slave_i
     ud->fde = fde;
     mem_buf_def_init(&ud->recv_buf);
     cycle_connect(cycle, fde, ia, 48888, 3, connect_server_callback, ud);
+    log(LOG_DEBUG, "slave_id %hd, content_length %lu\n", slave_id, content_length);
 }
 
 void master_distribute_block_done(upstream_data_t *ud, int status) {

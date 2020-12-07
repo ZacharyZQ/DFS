@@ -10,6 +10,8 @@ OBJS = $(patsubst %.c,%.o,$(SOURCES))
 .PHONY:clean all
 
 all: test master slave
+	mkdir -p log/
+	mkdir -p disk/
 test:$(OBJS)
 	$(CC) $(LDFLAGS) -o $@ $(EX_MAIN_OBJS) test.o
 

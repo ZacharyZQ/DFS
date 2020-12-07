@@ -3,8 +3,8 @@ void client_data_destory(client_data_t *cd);
 
 void slave_process_create_block(client_data_t *cd) {
     char *file_name = calloc(1, 200);
-    strcpy(file_name, "./block/");
-    char *key_text = file_name + strlen("./block/");
+    strcpy(file_name, "./disk/");
+    char *key_text = file_name + strlen("./disk/");
     md5_expand(cd->head.key, key_text);
     log(LOG_DEBUG, "key text is %s, filename is %s\n", key_text, file_name);
     FILE *fp = fopen(file_name, "w+");
@@ -135,6 +135,7 @@ void client_data_destory(client_data_t *cd) {
 }
 
 int parse_client_request(client_data_t *cd, char *buf, ssize_t size) {
+    log(LOG_DEBUG, "recv size %ld\n", size);
     mem_buf_append(&cd->recv_buf, buf, size);
     switch (cd->recv_stage) {
     case RECV_NOTHING:
@@ -143,6 +144,8 @@ int parse_client_request(client_data_t *cd, char *buf, ssize_t size) {
             if (check_ms_context(&cd->head) != 0) {
                 return -1;
             }
+            log(LOG_DEBUG, "parse head succ, method %hu extra_length %hu content_length %d\n",
+                    cd->head.method, cd->head.extra_length, cd->head.content_length);
             cd->recv_stage ++;
         } else {
             return 1;         //again read
@@ -159,7 +162,7 @@ int parse_client_request(client_data_t *cd, char *buf, ssize_t size) {
         {
             cd->recv_stage = RECV_DONE;
         } else {
-            break;
+            return 1;
         }
     case RECV_DONE:
         if (cd->head.extra_length > 0) {
@@ -243,6 +246,8 @@ void read_client_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
                     read_client_request, cd);
             return ;
         } else {
+            log(LOG_DEBUG, "parse succ, method %hu extra_length %hu content_length %d\n",
+                    cd->head.method, cd->head.extra_length, cd->head.content_length);
             process_client_request(cycle, cd);
             return ;
         }
@@ -256,7 +261,7 @@ void accept_client_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
         if (client_fde == NULL) {
             break;
         }
-        log(LOG_DEBUG, "accept slave connection, listen_fd %d, client fd %d\n",
+        log(LOG_DEBUG, "accept connection, listen_fd %d, client fd %d\n",
                 listen_fde->fd, client_fde->fd);
         cycle_set_timeout(cycle, &client_fde->timer, 5*1000,
                 read_client_request_timeout, NULL);

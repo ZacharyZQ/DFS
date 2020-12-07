@@ -194,12 +194,15 @@ void io_process_distribute_block(cycle_t *cycle, io_op_t *op) {
         }
     }
     log(LOG_DEBUG, "pread fd %d %d bytes\n", op->fd, cursor);
+    log(LOG_DEBUG, "offset %d, length %d\n", op->offset, op->length);
     for (i = 0; i < BACK_UP_COUNT; i ++) {
         if (op->bt->store_slave_id[i] != 0) {
             block_t *bt = op->bt;
             unsigned char *key = bt->key;
             char *temp_buf = calloc(1, op->length);
             memcpy(temp_buf, buf, op->length);
+            log(LOG_DEBUG, "slave id %hd, length %d, temp_buf %p\n",
+                    op->bt->store_slave_id[i], op->length, temp_buf);
             master_distribute_block(cycle, key, op->bt->store_slave_id[i], op->length, temp_buf,
                     io_process_distribute_block_done, op);
         }
