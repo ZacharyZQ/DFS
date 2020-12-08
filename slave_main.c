@@ -1,5 +1,20 @@
 #include "dfs_head.h"
-int main () {
+int main (int argc, char **argv) {
+    int daemon_mode = 0;
+    int ch;
+    while ((ch = getopt(argc, argv, "d")) != -1) {
+        switch (ch) {
+        case 'd':
+            daemon_mode = 1;
+            break;
+        default:
+            printf("-d\t\t\t\tdaemon mode\n\n");
+            exit(0);
+        }
+    }
+    if (daemon_mode) {
+        daemon(1, 0);
+    }
     log_init("log/slave.log");
     log(LOG_RUN_ERROR, "slave start\n");
     cycle_t *cycle = init_cycle();
