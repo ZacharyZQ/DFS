@@ -6,11 +6,12 @@
 typedef struct {
     cycle_t *cycle;
     dir_tree_t *tree;
-    hash_table *block_location_ht;
+    hash_table_t *block_hash_table;
     fd_entry_t *m_read_fde[IO_THREAD_NUM];
     fd_entry_t *m_write_fde[IO_THREAD_NUM];
     io_thread_t *iot_group[IO_THREAD_NUM];
 } master_t;
+
 typedef struct {
     fd_entry_t *fde;
     uint8_t admin_method;

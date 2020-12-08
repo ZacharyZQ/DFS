@@ -1,6 +1,6 @@
 #include "dfs_head.h"
 int check_ms_context(ms_context_t *a) {
-    if (a->method < 1 || a->method > 8) {
+    if (a->method < 1 || a->method > 10) {
         log(LOG_RUN_ERROR, "implement method\n");
     }
     if (a->slave_id < 0 || a->slave_id > MAX_SLAVE) {

@@ -28,9 +28,6 @@ void ad_destory(admin_data_t *ad) {
     if (ad->fd >= 0) {
         close(ad->fd);
     }
-    if (ad->fp) {
-        fclose(ad->fp);
-    }
     free(ad);
 }
 
@@ -243,15 +240,13 @@ void admin_process_mvFromLocal_done(admin_data_t *ad, int status, int block_id) 
         cycle_set_timeout(master.cycle, &ad->fde->timer, 5 * 1000,
                 send_admin_reply_timeout, ad);
         cycle_write(master.cycle, ad->fde, strdup(ad->reply), strlen(ad->reply),
-                2 * 1048576, send_admin_reply_done, ad);
+                strlen(ad->reply), send_admin_reply_done, ad);
     }
 }
 
 void admin_process_mvFromLocal(admin_data_t *ad) {
     int fd = open(ad->source_file, O_RDONLY);
-    FILE *fp = fdopen(fd, "r");
     ad->fd = fd;
-    ad->fp = fp;
     ssize_t file_size;
     int ret;
     int16_t block_num;
@@ -285,7 +280,7 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
         }
     }
     slave_flag1[0] = 1;
-    if (fd < 0 || !fp) {
+    if (fd < 0) {
         ad->reply = strdup("file can't open, please check file name\n");
         log(LOG_RUN_ERROR, "%s %s", ad->reply, ad->source_file);
         goto FINISH;
@@ -342,6 +337,7 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
         md5_update(&M, &i, sizeof(i)); //part index
         //md5_update(&M, &base, sizeof(base)); //slave info
         md5_final(bt->key, &M);
+        bt->hash.key = (char *)bt->key;
         base = hash_md5key(bt->key, max_current_slave);
         cursor = base;
         find_slave_num = 0;
@@ -357,9 +353,8 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
         }
         io_id = rand() % IO_THREAD_NUM;
         main_distribute_block(master.cycle, io_id, i, fd, i * BLOCK_SIZE,
-                block_length, bt,
-                admin_process_mvFromLocal_done, ad);
-        //every block has its own io thread
+                block_length, bt, admin_process_mvFromLocal_done, ad);
+        hash_join(master.block_hash_table, &bt->hash);
     }
     ad->async_callback = 1;
 FINISH:
@@ -371,7 +366,102 @@ FINISH:
     }
 }
 
+void admin_process_mvToLocal_done(admin_data_t *ad, int status, int block_id) {
+    if (status == 0) {
+        ad->map_block[block_id] = 1;
+    } else {
+        ad->map_block[block_id] = 2;
+    }
+    int i;
+    int all_succ = 1;
+    int all_finish = 1;
+    for (i = 0; i < ad->block_num; i ++) {
+        if (ad->map_block[i] == 0) {
+            all_finish = 0;
+        }
+        if (ad->map_block[i] == 2) {
+            all_succ = 0;
+        }
+    }
+    if (all_succ && all_finish) {
+        cycle_close(master.cycle, ad->fde);
+        ad_destory(ad);
+        return ;
+    } else if (all_finish) {
+        ad->reply = strdup("COPY failed\n");
+        cycle_set_timeout(master.cycle, &ad->fde->timer, 5 * 1000,
+                send_admin_reply_timeout, ad);
+        cycle_write(master.cycle, ad->fde, strdup(ad->reply), strlen(ad->reply),
+                strlen(ad->reply), send_admin_reply_done, ad);
+    }
+    
+}
+
 void admin_process_mvToLocal(admin_data_t *ad) {
+    int fd = open(ad->dest_file, O_CREAT | O_WRONLY | O_TRUNC, 0644);
+    ad->fd = fd;
+    ssize_t file_size;
+    int16_t block_num;
+    int16_t i;
+    int max_current_slave;
+    block_t *bt;
+    int io_id;
+    int block_length = 0;
+    unsigned char key[16];
+    dirtree_node_t *file_node;
+    for (i = 1; i < MAX_SLAVE; i ++) {
+        if (slave_group[i] == NULL) {
+            max_current_slave = i;
+            break;
+        }
+    }
+    if (max_current_slave == 1) {
+        ad->reply = strdup("no slave\n");
+        return;
+    }
+    if (fd < 0) {
+        ad->reply = strdup("file can't open or creat, please check file name\n");
+        log(LOG_RUN_ERROR, "%s %s", ad->reply, ad->dest_file);
+        return;
+    }
+    file_node = dir_tree_search_file(master.tree, ad->source_file);
+    if (file_node == NULL) {
+        ad->reply = strdup("file not existed\n");
+        return;
+    }
+    assert(file_node->type == T_FILE);
+    file_size = file_node->obj.file_info.content_length;
+    assert(file_size > 0);
+    block_num = file_size / BLOCK_SIZE;
+    if (file_size % BLOCK_SIZE > 0) {
+        block_num ++;
+    }
+    ad->block_num = block_num;
+    ad->map_block = (int8_t *)calloc(block_num, sizeof(int8_t));
+    for (i = 0; i < block_num; i ++) {
+        if (i == block_num - 1) {
+            if (file_size % BLOCK_SIZE == 0) {
+                block_length = BLOCK_SIZE;
+            } else {
+                block_length = file_size % BLOCK_SIZE;
+            }
+        } else {
+            block_length = BLOCK_SIZE;
+        }
+        md5_context M;
+        md5_init(&M);
+        md5_update(&M, ad->source_file, strlen(ad->source_file)); //file name
+        md5_update(&M, &i, sizeof(i)); //part index
+        md5_final(key, &M);
+        bt = (block_t *)hash_lookup(master.block_hash_table, key);
+        assert(bt);
+        io_id = rand() % IO_THREAD_NUM;
+        main_get_block(master.cycle, io_id, i, fd, i * BLOCK_SIZE,
+                block_length, bt,
+                admin_process_mvToLocal_done, ad);
+        //every block has its own io thread
+    }
+    ad->async_callback = 1;
 }
 
 void process_admin_request(cycle_t *cycle, admin_data_t *ad) {
@@ -519,9 +609,24 @@ void accept_admin_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
     cycle_set_event(cycle, listen_fde, CYCLE_READ_EVENT, accept_admin_handler, NULL);
 }
 
-int main () {
+int main (int argc, char **argv) {
+    int daemon_mode = 0;
+    int ch;
+    while ((ch = getopt(argc, argv, "d")) != -1) {
+        switch (ch) {
+        case 'd':
+            daemon_mode = 1;
+            break;
+        default:
+            printf("-d\t\t\t\tdaemon mode\n\n");
+            exit(0);
+        }
+    }
+    if (daemon_mode) {
+        daemon(1, 0);
+    }
     log_init("log/master.log");
-    log(LOG_RUN_ERROR, "master start\n");
+    log(LOG_RUN_ERROR, "master start, pid is %d\n", getpid());
     master_init();
     cycle_t *cycle = init_cycle();
     master.cycle = cycle;

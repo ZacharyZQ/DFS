@@ -3,6 +3,7 @@
 #include <stdint.h>
 #include "master.h"
 #define M_METHOD_CREATE ((uint16_t)1)
+#define M_METHOD_GET    ((uint16_t)9)
 #define M_METHOD_DELETE ((uint16_t)2)
 #define M_METHOD_QUERY  ((uint16_t)3)
 #define S_METHOD_REG    ((uint16_t)4)

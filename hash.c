@@ -3,8 +3,8 @@
 #include "hash.h"
 #include "dfs_head.h"
 
-hash_table* hash_create(HASHCMP* cmp, int size, HASHHASH* hash_func) {
-    hash_table* hid = (hash_table*)calloc(1, sizeof(hash_table));
+hash_table_t* hash_create(HASHCMP* cmp, int size, HASHHASH* hash_func) {
+    hash_table_t* hid = (hash_table_t*)calloc(1, sizeof(hash_table_t));
 
     hid->size = (unsigned int) size;
     /* allocate and null the buckets */
@@ -19,7 +19,7 @@ hash_table* hash_create(HASHCMP* cmp, int size, HASHHASH* hash_func) {
     hid->hash = hash_func;
     return hid;
 }
-void hash_join(hash_table* hid, hash_link* hl) {
+void hash_join(hash_table_t* hid, hash_link* hl) {
     int i;
     i = hid->hash(hl->key, hid->size);
     hl->next = hid->buckets[i];
@@ -28,7 +28,7 @@ void hash_join(hash_table* hid, hash_link* hl) {
 }
 
 //only remove from hash table, not freeing item
-void hash_remove_link(hash_table* hid, hash_link* hl) {
+void hash_remove_link(hash_table_t* hid, hash_link* hl) {
     assert(hl != NULL);
     assert(hl->key);
     int i;
@@ -50,7 +50,7 @@ void hash_remove_link(hash_table* hid, hash_link* hl) {
     assert(0);
 }
 
-void* hash_lookup(hash_table* hid, const void* k) {
+void* hash_lookup(hash_table_t* hid, const void* k) {
     assert(k != NULL);
     unsigned int b = hid->hash(k, hid->size);
     int i = 0;
@@ -83,7 +83,7 @@ void* hash_lookup(hash_table* hid, const void* k) {
     return NULL;
 }
 
-void hash_free_memory(hash_table* hid) {
+void hash_free_memory(hash_table_t* hid) {
     assert(hid != NULL);
 
     if (hid->buckets) {

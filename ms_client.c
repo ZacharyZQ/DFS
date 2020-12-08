@@ -1,6 +1,64 @@
 #include "dfs_head.h"
 void client_data_destory(client_data_t *cd);
 
+void slave_process_get_block(client_data_t *cd) {
+    char *file_name = calloc(1, 200);
+    strcpy(file_name, "./disk/");
+    char *key_text = file_name + strlen("./disk/");
+    md5_expand(cd->head.key, key_text);
+    log(LOG_DEBUG, "key text is %s, filename is %s\n", key_text, file_name);
+    int fd = open(file_name, O_RDONLY);
+    int file_size;
+    int cursor = 0;
+    if (fd < 0) {
+        log(LOG_RUN_ERROR, "filename %s open failed\n", file_name);
+        goto FAILED;
+    }
+    if (cd->content_buf) {
+        free(cd->content_buf);
+        cd->content_buf = NULL;
+    }
+    file_size = lseek(fd, 0, SEEK_END);
+    cd->head.content_length = file_size;
+    cd->content_buf = calloc(1, file_size);
+    while (cursor < file_size) {
+        int pread_ret = pread(fd, cd->content_buf + cursor, file_size - cursor, 0 + cursor);
+        if (pread_ret <= 0) {
+            if (errno_ignorable(errno)) {
+                continue;
+            }
+            goto FAILED;
+        } else {
+            cursor += pread_ret;
+        }
+    }
+    cd->head.method = METHOD_ACK_SUCC;
+    if (cd->extra_buf) {
+        free(cd->extra_buf);
+        cd->extra_buf = NULL;
+    }
+    cd->head.extra_length = 0;
+    log(LOG_DEBUG, "process succ %s\n", file_name);
+    free(file_name);
+    return;
+FAILED:
+    cd->head.method = METHOD_ACK_FAILED;
+    cd->head.content_length = 0;
+    cd->head.extra_length = 0;
+    if (cd->content_buf) {
+        free(cd->content_buf);
+        cd->content_buf = NULL;
+    }
+    if (cd->extra_buf) {
+        free(cd->extra_buf);
+        cd->extra_buf = NULL;
+    }
+    if (fd > 0) {
+        close(fd);
+    }
+    free(file_name);
+}
+
 void slave_process_create_block(client_data_t *cd) {
     char *file_name = calloc(1, 200);
     strcpy(file_name, "./disk/");
@@ -87,6 +145,9 @@ void process_client_request(cycle_t *cycle, client_data_t *cd) {
     switch (cd->head.method) {
     case M_METHOD_CREATE:
         slave_process_create_block(cd);
+        break;
+    case M_METHOD_GET:
+        slave_process_get_block(cd);
         break;
     case M_METHOD_DELETE:
     case M_METHOD_QUERY:

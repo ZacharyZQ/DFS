@@ -11,7 +11,7 @@ typedef struct _hash_link {
     struct _hash_link* next;
 } hash_link;
 
-typedef struct _hash_table {
+typedef struct _hash_table_t {
     //a store_hash_link array
     hash_link** buckets;
     HASHCMP* cmp;
@@ -25,15 +25,15 @@ typedef struct _hash_table {
     hash_link* next;
 #endif
     int count;
-} hash_table;
+} hash_table_t;
 
 unsigned int hash_n_string(const void* data, unsigned int size, size_t len);
 
-extern hash_table* hash_create(HASHCMP*, int, HASHHASH*);
-extern void hash_join(hash_table*, hash_link*);
-extern void hash_remove_link(hash_table*, hash_link*);
-extern void* hash_lookup(hash_table*, const void*);
-extern void hash_free_memory(hash_table*);
+extern hash_table_t* hash_create(HASHCMP*, int, HASHHASH*);
+extern void hash_join(hash_table_t*, hash_link*);
+extern void hash_remove_link(hash_table_t*, hash_link*);
+extern void* hash_lookup(hash_table_t*, const void*);
+extern void hash_free_memory(hash_table_t*);
 extern HASHHASH hash_string;
 extern HASHHASH hash_md5key;
 int int_key_cmp(const void* str1, const void* str2);

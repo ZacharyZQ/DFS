@@ -33,5 +33,7 @@ typedef struct {
 void io_thread_init(cycle_t *cycle);
 void main_distribute_block(cycle_t *cycle, int io_id, int block_id, int fd,
         int offset, int length, block_t *bt, void *callback, void *data);
+void main_get_block(cycle_t *cycle, int io_id, int block_id, int fd,
+        int offset, int length, block_t *bt, void *callback, void *data);
 
 #endif

@@ -33,6 +33,7 @@
 #include "fs.h"
 #include "master.h"
 #include "io_thread.h"
+#include "bfs.h"
 
 #define _GNU_SOURCE
 #define BACK_UP_COUNT 2

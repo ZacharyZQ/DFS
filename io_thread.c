@@ -9,8 +9,16 @@ void master_process_pipe_callback(cycle_t *cycle, fd_entry_t *fde, void* data);
 void main_distribute_block_done(cycle_t *cycle, io_op_t *op);
 void io_process_distribute_block(cycle_t *cycle, io_op_t *op);
 void io_process_distribute_block_done(io_op_t *op, int slave_id, int status);
+void main_get_block_done(cycle_t *cycle, io_op_t *op);
+void io_process_get_block(cycle_t *cycle, io_op_t *op);
+void io_process_get_block_done(io_op_t *op, int slave_id, int status);
+void block_mark_slave_available(block_t *bt, int slave_id); 
+void block_mark_slave_unavailable(block_t *bt, int slave_id);
 
 void op_destory(io_op_t *op) {
+    if (op->buf) {
+        free(op->buf);
+    }
     free(op);
 }
 
@@ -99,6 +107,7 @@ void master_process_pipe_callback(cycle_t *cycle, fd_entry_t *fde, void* data) {
             main_distribute_block_done(cycle, op);
             break;
         case IO_READ:
+            main_get_block_done(cycle, op);
             break;
         }
         op_destory(op);
@@ -121,6 +130,7 @@ void io_process_pipe_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
         op->io_cycle = cycle;
         switch (op->type) {
         case IO_READ:
+            io_process_get_block(cycle, op);
             break;
         case IO_WRITE:
             io_process_distribute_block(cycle, op);
@@ -211,6 +221,7 @@ void io_process_distribute_block(cycle_t *cycle, io_op_t *op) {
 }
 
 void io_process_distribute_block_done(io_op_t *op, int slave_id, int status) {
+    int i;
     if (slave_id == 0) {
         log(LOG_RUN_ERROR, "pread file error\n");
         op->status = -1;
@@ -218,25 +229,132 @@ void io_process_distribute_block_done(io_op_t *op, int slave_id, int status) {
         return ;
     }
     if (status == 0) {
-        op->bt->store_slave_status[slave_id] = 1;
+        block_mark_slave_available(op->bt, slave_id);
     } else {
+        block_mark_slave_unavailable(op->bt, slave_id);
         log(LOG_RUN_ERROR, "slave process error, slave_id %d\n", slave_id);
-        op->bt->store_slave_status[slave_id] = 2;
     }
-    int i;
     int all_succ = 1;
     op->status = -1;
     for (i = 0; i < BACK_UP_COUNT; i ++) {
         //wait the end connection back
-        if (op->bt->store_slave_id[i] != 0 && op->bt->store_slave_status[slave_id] == 0) {
+        if (op->bt->store_slave_id[i] != 0 && op->bt->store_slave_status[i] == 0) {
             all_succ = 0;
         }
         //only one slave succ, the file store succ
-        if (op->bt->store_slave_id[i] != 0 && op->bt->store_slave_status[slave_id] == 1) {
+        if (op->bt->store_slave_id[i] != 0 && op->bt->store_slave_status[i] == 1) {
             op->status = 0;
         }
     }
     if (all_succ) {
         io_put_response(op->io_cycle, op);
+    }
+}
+
+void main_get_block(cycle_t *cycle, int io_id, int block_id, int fd,
+        int offset, int length, block_t *bt, void *callback, void *data)
+{
+    io_op_t *op = calloc(1, sizeof(io_op_t));
+    op->type = IO_READ;
+    op->fd = fd;
+    op->offset = offset;
+    op->length = length;
+    op->bt = bt;
+    op->callback = callback;
+    op->data = data;
+    op->main_cycle = cycle;
+    op->io_id = io_id;
+    op->block_id = block_id;
+    main_put_request(op);
+}
+
+void main_get_block_done(cycle_t *cycle, io_op_t *op) {
+    void (*cb)(admin_data_t *ad, int status, int block_id) =
+            (void (*)(admin_data_t *, int, int))op->callback;
+    admin_data_t *ad = op->data;
+    cb(ad, op->status, op->block_id);
+}
+
+void io_process_get_block(cycle_t *cycle, io_op_t *op) {
+    int i;
+    for (i = 0; i < BACK_UP_COUNT; i ++) {
+        if (op->bt->store_slave_id[i] != 0 && op->bt->store_slave_status[i] == 1) {
+            log(LOG_DEBUG, "slave id %hd, length %d\n",
+                    op->bt->store_slave_id[i], op->length);
+            master_get_block(cycle, op->bt->key, op->bt->store_slave_id[i], op->length,
+                    io_process_get_block_done, op);
+            return ;
+        }
+    }
+    log(LOG_RUN_ERROR, "no available slave, %d\n", op->block_id);
+    io_process_get_block_done(op, 0, -1);
+}
+
+void io_process_get_block_done(io_op_t *op, int slave_id, int status) {
+    int i;
+    ssize_t cursor = 0;
+    int write_ret;
+    if (slave_id == 0) {
+        log(LOG_RUN_ERROR, "slave id error\n");
+        op->status = -1;
+        goto FINISH;
+    }
+    if (status == 0) {
+        block_mark_slave_available(op->bt, slave_id);
+        goto SUCC;
+    } else {
+        log(LOG_RUN_ERROR, "slave process error, slave_id %d, try to find backup slave\n", slave_id);
+        block_mark_slave_unavailable(op->bt, slave_id);
+    }
+
+    for (i = 0; i < BACK_UP_COUNT; i ++) {
+        if (op->bt->store_slave_id[i] != 0 && op->bt->store_slave_status[slave_id] == 1) {
+            log(LOG_DEBUG, "slave id %hd, length %d\n",
+                    op->bt->store_slave_id[i], op->length);
+            master_get_block(op->io_cycle, op->bt->key, op->bt->store_slave_id[i], op->length,
+                    io_process_get_block_done, op);
+            return;
+        }
+    }
+    op->status = -1;
+    goto FINISH;
+SUCC:
+    assert(op->buf);
+    while (cursor < op->length) {
+        write_ret = pwrite(op->fd, op->buf + cursor, op->length - cursor, op->offset + cursor);
+        if (write_ret > 0) {
+            cursor += write_ret;
+        } else {
+            if (errno_ignorable(errno)) {
+                continue;
+            }
+            log(LOG_RUN_ERROR, "pwrite error\n", op->fd, cursor);
+            op->status = -1;
+            goto FINISH;
+        }
+    }
+    log(LOG_DEBUG, "pwrite fd %d %d bytes\n", op->fd, cursor);
+    log(LOG_DEBUG, "offset %d, length %d\n", op->offset, op->length);
+    op->status = 0;
+FINISH:
+    io_put_response(op->io_cycle, op);
+}
+
+void block_mark_slave_available(block_t *bt, int slave_id) {
+    int i;
+    for (i = 0; i < BACK_UP_COUNT; i ++) {
+        if (bt->store_slave_id[i] == slave_id) {
+            bt->store_slave_status[i] = 1;
+        }
+        return ;
+    }
+}
+void block_mark_slave_unavailable(block_t *bt, int slave_id) {
+    int i;
+    for (i = 0; i < BACK_UP_COUNT; i ++) {
+        if (bt->store_slave_id[i] == slave_id) {
+            bt->store_slave_status[i] = 2;
+        }
+        return ;
     }
 }

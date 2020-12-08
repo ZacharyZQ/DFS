@@ -1,5 +1,6 @@
 #include "dfs_head.h"
 void master_distribute_block_done(upstream_data_t *ud, int status);
+void master_get_block_done(upstream_data_t *ud, int status);
 void process_upstream_reply(cycle_t *cycle, upstream_data_t *ud) {
     cycle_close(cycle, ud->fde);
     ud->fde = NULL;
@@ -261,12 +262,61 @@ void master_distribute_block_done(upstream_data_t *ud, int status) {
         log(LOG_RUN_ERROR, "distribute block error\n");
         flag = -1;
     }
-    //
-    //
-    //need judge slave response, not implement
-    //
-    //
+    if (ud->head.method == METHOD_ACK_FAILED) {
+        log(LOG_RUN_ERROR, "slave return error\n");
+        flag = -1;
+    }
     io_op_t *op = (io_op_t *)ud->data;
+    void (*cb)(io_op_t *op, int slave_id, int status) = 
+        (void (*)(io_op_t *, int, int))ud->callback;
+    cb(op, ud->head.slave_id, flag);
+    ud_destory(ud);
+}
+
+void master_get_block(cycle_t *cycle, unsigned char *key, int16_t slave_id, int32_t content_length,
+        void *callback, void *data)
+{
+    upstream_data_t *ud = ud_init();
+    ud->head.method = M_METHOD_GET;
+    ud->head.slave_id = slave_id;
+    memcpy(ud->head.key, key, 16);
+    ud->head.content_length = 0;
+    ud->head.extra_length = 0;
+    ud->extra_buf = NULL;
+    ud->operation_callback = master_get_block_done;
+    ud->callback = callback;
+    ud->data = data;
+    struct in_addr ia;
+    fd_entry_t *fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
+            1048576 * 2, 1048576 * 2);
+    safe_inet_addr("127.0.0.1", &ia);
+    ud->fde = fde;
+    mem_buf_def_init(&ud->recv_buf);
+    cycle_connect(cycle, fde, ia, 48888, 3, connect_server_callback, ud);
+    log(LOG_DEBUG, "slave_id %hd, content_length %lu\n", slave_id, content_length);
+}
+
+void master_get_block_done(upstream_data_t *ud, int status) {
+    int flag = 0;
+    log(LOG_RUN_ERROR, "master end get block, status %d\n", status);
+    if (status != 0) {
+        log(LOG_RUN_ERROR, "get block error\n");
+        flag = -1;
+    }
+    if (ud->head.method == METHOD_ACK_FAILED) {
+        log(LOG_RUN_ERROR, "slave get block error\n");
+        flag = -1;
+    }
+    io_op_t *op = (io_op_t *)ud->data;
+    if (ud->head.content_length != op->length) {
+        log(LOG_RUN_ERROR, "block size not match\n");
+        flag = -1;
+    }
+    if (op->buf) {
+        free(op->buf);
+    }
+    op->buf = calloc(1, op->length);
+    memcpy(op->buf, ud->content_buf, op->length);
     void (*cb)(io_op_t *op, int slave_id, int status) = 
         (void (*)(io_op_t *, int, int))ud->callback;
     cb(op, ud->head.slave_id, flag);

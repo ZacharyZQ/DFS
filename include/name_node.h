@@ -1,9 +1,11 @@
 #ifndef __NAME_NODE
 #define __NAME_NODE
 #include <stdint.h>
+#include "hash.h"
 
 #pragma pack(1)
 typedef struct block_s {
+    hash_link hash;
     unsigned char key[16];
     uint32_t block_length;
     uint32_t part;

@@ -20,4 +20,6 @@ typedef struct upstream_data_s {
 void slave_register(cycle_t *cycle);
 void master_distribute_block(cycle_t *cycle, unsigned char *key, int16_t slave_id, int32_t content_length,
         void *content_buf, void *callback, void *data);
+void master_get_block(cycle_t *cycle, unsigned char *key, int16_t slave_id, int32_t content_length,
+        void *callback, void *data);
 #endif
