@@ -18,6 +18,8 @@
 #include <netinet/in.h>
 #include <ctype.h>
 #include <pthread.h>
+#include <sys/time.h>
+#include <sys/resource.h>
 #include "cycle.h"
 #include "dir_tree.h"
 #include "epoll.h"

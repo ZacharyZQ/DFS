@@ -1,5 +1,6 @@
 #include "dfs_head.h"
 int main (int argc, char **argv) {
+    set_limits();
     int daemon_mode = 0;
     int ch;
     while ((ch = getopt(argc, argv, "d")) != -1) {

@@ -175,7 +175,7 @@ void process_client_request(cycle_t *cycle, client_data_t *cd) {
                 cd->content_buf, cd->head.content_length);
     }
     int size = sizeof(ms_context_t) + cd->head.extra_length + cd->head.content_length;
-    cycle_set_timeout(cycle, &cd->fde->timer, 5 * 1000, send_client_reply_timeout, cd);
+    cycle_set_timeout(cycle, &cd->fde->timer, 50 * 1000, send_client_reply_timeout, cd);
     cycle_write(cycle, cd->fde, buf, size, 2 * 1048576, send_client_reply_done, cd);
 }
 
@@ -270,7 +270,7 @@ void read_client_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
     log(LOG_DEBUG, "read %ld bytes from fd %d\n", size, fde->fd);
     if (size < 0) {
         if (errno_ignorable(errno)) {
-            cycle_set_timeout(cycle, &fde->timer, 5 * 1000,
+            cycle_set_timeout(cycle, &fde->timer, 50 * 1000,
                     read_client_request_timeout, data);
             cycle_set_event(cycle, fde, CYCLE_READ_EVENT, read_client_request, data);
         } else {
@@ -305,7 +305,7 @@ void read_client_request(cycle_t *cycle, fd_entry_t *fde, void* data) {
             cd = NULL;
             return ;
         } else if (ret > 0) {
-            cycle_set_timeout(cycle, &fde->timer, 5 * 1000,
+            cycle_set_timeout(cycle, &fde->timer, 50 * 1000,
                     read_client_request_timeout, cd);
             cycle_set_event(cycle, fde, CYCLE_READ_EVENT,
                     read_client_request, cd);
@@ -328,10 +328,10 @@ void accept_client_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
         }
         log(LOG_DEBUG, "accept connection, listen_fd %d, client fd %d\n",
                 listen_fde->fd, client_fde->fd);
-        cycle_set_timeout(cycle, &client_fde->timer, 5*1000,
+        cycle_set_timeout(cycle, &client_fde->timer, 50*1000,
                 read_client_request_timeout, NULL);
         cycle_set_event(cycle, client_fde, CYCLE_READ_EVENT, read_client_request, NULL);
     }
-    cycle_set_timeout(cycle, &listen_fde->timer, 5 * 1000, accept_client_timeout, NULL);
+    cycle_set_timeout(cycle, &listen_fde->timer, 50 * 1000, accept_client_timeout, NULL);
     cycle_set_event(cycle, listen_fde, CYCLE_READ_EVENT, accept_client_handler, NULL);
 }

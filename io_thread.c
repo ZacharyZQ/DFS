@@ -162,7 +162,7 @@ void io_put_response(cycle_t *cycle, io_op_t *op) {
 }
 
 void main_distribute_block(cycle_t *cycle, int io_id, int block_id, int fd,
-        int offset, int length, block_t *bt, void *callback, void *data)
+        off_t offset, uint32_t length, block_t *bt, void *callback, void *data)
 {
     io_op_t *op = calloc(1, sizeof(io_op_t));
     op->type = IO_WRITE;
@@ -194,24 +194,26 @@ void io_process_distribute_block(cycle_t *cycle, io_op_t *op) {
         if (read_ret > 0) {
             cursor += read_ret;
         } else {
+            int my_errno = errno;
             if (errno_ignorable(errno)) {
                 continue;
             }
-            log(LOG_RUN_ERROR, "pread error\n", op->fd, cursor);
+            log(LOG_RUN_ERROR, "pread error, errno %d, cursor %d, offset %ld, len %u\n",
+                    my_errno, cursor, op->offset, op->length);
             free(buf);
             io_process_distribute_block_done(op, 0, -1);
             return ;
         }
     }
     log(LOG_DEBUG, "pread fd %d %d bytes\n", op->fd, cursor);
-    log(LOG_DEBUG, "offset %d, length %d\n", op->offset, op->length);
+    log(LOG_DEBUG, "offset %ld, length %u\n", op->offset, op->length);
     for (i = 0; i < BACK_UP_COUNT; i ++) {
         if (op->bt->store_slave_id[i] != 0) {
             block_t *bt = op->bt;
             unsigned char *key = bt->key;
             char *temp_buf = calloc(1, op->length);
             memcpy(temp_buf, buf, op->length);
-            log(LOG_DEBUG, "slave id %hd, length %d, temp_buf %p\n",
+            log(LOG_DEBUG, "slave id %hd, length %u, temp_buf %p\n",
                     op->bt->store_slave_id[i], op->length, temp_buf);
             master_distribute_block(cycle, key, op->bt->store_slave_id[i], op->length, temp_buf,
                     io_process_distribute_block_done, op);
@@ -252,7 +254,7 @@ void io_process_distribute_block_done(io_op_t *op, int slave_id, int status) {
 }
 
 void main_get_block(cycle_t *cycle, int io_id, int block_id, int fd,
-        int offset, int length, block_t *bt, void *callback, void *data)
+        off_t offset, uint32_t length, block_t *bt, void *callback, void *data)
 {
     io_op_t *op = calloc(1, sizeof(io_op_t));
     op->type = IO_READ;
@@ -279,14 +281,14 @@ void io_process_get_block(cycle_t *cycle, io_op_t *op) {
     int i;
     for (i = 0; i < BACK_UP_COUNT; i ++) {
         if (op->bt->store_slave_id[i] != 0 && op->bt->store_slave_status[i] == 1) {
-            log(LOG_DEBUG, "slave id %hd, length %d\n",
-                    op->bt->store_slave_id[i], op->length);
+            log(LOG_DEBUG, "block id %d, slave id %hd, length %u\n",
+                    op->block_id, op->bt->store_slave_id[i], op->length);
             master_get_block(cycle, op->bt->key, op->bt->store_slave_id[i], op->length,
                     io_process_get_block_done, op);
             return ;
         }
     }
-    log(LOG_RUN_ERROR, "no available slave, %d\n", op->block_id);
+    log(LOG_RUN_ERROR, "no available slave, block id %d\n", op->block_id);
     io_process_get_block_done(op, 0, -1);
 }
 
@@ -295,7 +297,7 @@ void io_process_get_block_done(io_op_t *op, int slave_id, int status) {
     ssize_t cursor = 0;
     int write_ret;
     if (slave_id == 0) {
-        log(LOG_RUN_ERROR, "slave id error\n");
+        log(LOG_RUN_ERROR, "slave id error, block id %d\n", op->block_id);
         op->status = -1;
         goto FINISH;
     }
@@ -303,20 +305,22 @@ void io_process_get_block_done(io_op_t *op, int slave_id, int status) {
         block_mark_slave_available(op->bt, slave_id);
         goto SUCC;
     } else {
-        log(LOG_RUN_ERROR, "slave process error, slave_id %d, try to find backup slave\n", slave_id);
+        log(LOG_RUN_ERROR, "slave process error, block_id %d, slave_id %d, "
+                "try to find backup slave\n", op->block_id, slave_id);
         block_mark_slave_unavailable(op->bt, slave_id);
     }
 
     for (i = 0; i < BACK_UP_COUNT; i ++) {
         if (op->bt->store_slave_id[i] != 0 && op->bt->store_slave_status[slave_id] == 1) {
-            log(LOG_DEBUG, "slave id %hd, length %d\n",
-                    op->bt->store_slave_id[i], op->length);
+            log(LOG_DEBUG, "slave id %hd, length %u, block id %d\n",
+                    op->bt->store_slave_id[i], op->length, op->block_id);
             master_get_block(op->io_cycle, op->bt->key, op->bt->store_slave_id[i], op->length,
                     io_process_get_block_done, op);
             return;
         }
     }
     op->status = -1;
+    log(LOG_RUN_ERROR, "no available slave, block id %d\n", op->block_id);
     goto FINISH;
 SUCC:
     assert(op->buf);
@@ -334,7 +338,7 @@ SUCC:
         }
     }
     log(LOG_DEBUG, "pwrite fd %d %d bytes\n", op->fd, cursor);
-    log(LOG_DEBUG, "offset %d, length %d\n", op->offset, op->length);
+    log(LOG_DEBUG, "offset %ld, length %u\n", op->offset, op->length);
     op->status = 0;
 FINISH:
     io_put_response(op->io_cycle, op);

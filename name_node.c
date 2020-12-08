@@ -73,7 +73,7 @@ int create_dir(char *path) {
     return 0;
 }
 
-int create_file(char *path, uint32_t content_length) {
+int create_file(char *path, uint64_t content_length) {
     if (!check_path_name_valid(path)) {
         return -1;
     }   

@@ -14,7 +14,7 @@ epoll_t* epoll_event_driven_init() {
     epoll_t* e = (epoll_t*)calloc(1, sizeof(epoll_t));
     e->num_fds = 0;
     e->epoll_fd = epollfd;
-    e->old_fd_events = (unsigned int*)calloc(65536, sizeof(unsigned int));
+    e->old_fd_events = (unsigned int*)calloc(MAX_FD, sizeof(unsigned int));
 
     return e;
 }

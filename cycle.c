@@ -10,7 +10,7 @@ cycle_t *init_cycle() {
     cycle->e->cycle = cycle;
     cycle->rbtree = calloc(1, sizeof(rbtree_t));
     rbtree_init(cycle->rbtree, rbtree_insert_timer_value);
-    cycle->fde_table = (fd_entry_t *)calloc(65536, sizeof(fd_entry_t));
+    cycle->fde_table = (fd_entry_t *)calloc(MAX_FD, sizeof(fd_entry_t));
     return cycle;
 }
 
@@ -446,7 +446,7 @@ fd_entry_t* cycle_open_tcp_nobind(cycle_t* cycle, int flags, unsigned short mypo
 int cycle_listen(cycle_t* cycle, fd_entry_t* fde) {
     assert(fde->fd >= 0);
     int x = 0;
-    if ((x = listen(fde->fd, 65536 >> 2)) < 0) {
+    if ((x = listen(fde->fd, MAX_FD)) < 0) {
         assert(0);
     }
     fde->listening = 1;
@@ -900,3 +900,46 @@ int safe_inet_addr(const char* buf, struct in_addr* addr) {
 
     return 1;
 }
+
+#if 0
+typedef struct {
+    int l_onoff;
+    int l_linger;
+} cycle_socket_linger_t;
+
+void set_linger(int fd, int linger) {
+    if (linger < 0) { 
+        return;
+    }    
+
+    cycle_socket_linger_t so_linger;
+    so_linger.l_onoff = 1; 
+    so_linger.l_linger = linger;
+
+    setsockopt(fd, SOL_SOCKET, SO_LINGER,
+            &so_linger, sizeof(so_linger));
+}
+#endif
+
+void set_limits() {
+    struct rlimit rl;
+    if (getrlimit(RLIMIT_NOFILE, &rl) != 0) {
+        log(LOG_RUN_ERROR, "!getrlimit failed %d %s\n", errno, strerror(errno));
+        exit(1);
+    }
+    if (rl.rlim_cur > MAX_FD || rl.rlim_max > MAX_FD) {
+        rl.rlim_cur = MAX_FD;
+        rl.rlim_max = MAX_FD;
+        if (setrlimit(RLIMIT_NOFILE, &rl)) {
+            log(LOG_RUN_ERROR, "!setrlimit to %d failed %d %s\n", MAX_FD, errno, strerror(errno));
+            exit(1);
+        }    
+    }    
+    struct rlimit rlcore;
+    rlcore.rlim_cur = RLIM_INFINITY;
+    rlcore.rlim_max = RLIM_INFINITY;
+    if (setrlimit(RLIMIT_CORE, &rlcore) != 0) {
+        log(LOG_RUN_ERROR, "!setrlimit of core to UNLIMITED failed %d %s\n", errno, strerror(errno));
+    }
+}
+

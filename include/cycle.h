@@ -11,6 +11,8 @@
 #define CYCLE_READ_EVENT (0x1)
 #define CYCLE_WRITE_EVENT (0x2)
 
+#define MAX_FD 65536
+
 #define CYCLE_OK           (0)
 #define CYCLE_ERROR       (-1)
 #define CYCLE_NOMESSAGE   (-3)
@@ -142,6 +144,8 @@ void cycle_connect(cycle_t* cycle, fd_entry_t* fde, struct in_addr ip,
         unsigned short port, time_t connect_timeout, CCB* callback, void* data);
 fd_entry_t* cycle_find_fde(cycle_t* cycle, int fd);
 int safe_inet_addr(const char* buf, struct in_addr* addr);
+//void set_linger(int fd, int linger);
+void set_limits();
 
 
 #endif

@@ -72,7 +72,7 @@ void recv_upstream_reply_callback(cycle_t *cycle, fd_entry_t *fde, void* data) {
     if (size < 0) {
         free(buf);
         if (errno_ignorable(errno)) {
-            cycle_set_timeout(cycle, &fde->timer, 5 * 1000,
+            cycle_set_timeout(cycle, &fde->timer, 50 * 1000,
                     recv_upstream_reply_timeout, ud);
             cycle_set_event(cycle, fde, CYCLE_READ_EVENT, recv_upstream_reply_callback, ud);
             return ;
@@ -101,7 +101,7 @@ void recv_upstream_reply_callback(cycle_t *cycle, fd_entry_t *fde, void* data) {
             ud->fde = NULL;
             return ;
         } else if (ret > 0) {
-            cycle_set_timeout(cycle, &fde->timer, 5 * 1000,
+            cycle_set_timeout(cycle, &fde->timer, 50 * 1000,
                     recv_upstream_reply_timeout, ud);
             cycle_set_event(cycle, fde, CYCLE_READ_EVENT,
                     recv_upstream_reply_callback, ud);
@@ -137,7 +137,7 @@ void send_upstream_request_callback(struct cycle_s *cycle, struct fd_entry_s *fd
         return ;
     }
     log(LOG_DEBUG, "send succ\n");
-    cycle_set_timeout(cycle, &fde->timer, 5 * 1000, recv_upstream_reply_timeout, ud);
+    cycle_set_timeout(cycle, &fde->timer, 50 * 1000, recv_upstream_reply_timeout, ud);
     cycle_set_event(cycle, fde, CYCLE_READ_EVENT, recv_upstream_reply_callback, ud);
 }
 
@@ -174,7 +174,7 @@ void connect_server_callback(struct cycle_s *cycle, struct fd_entry_s *fde,
         free(ud->content_buf);
         ud->content_buf = NULL;
     }
-    cycle_set_timeout(cycle, &fde->timer, 5 * 1000, send_upstream_request_timeout, ud);
+    cycle_set_timeout(cycle, &fde->timer, 50 * 1000, send_upstream_request_timeout, ud);
     cycle_write(cycle, fde, buf, size, 2 * 1048576, send_upstream_request_callback, ud);
 }
 
@@ -245,8 +245,12 @@ void master_distribute_block(cycle_t *cycle, unsigned char *key, int16_t slave_i
     ud->operation_callback = master_distribute_block_done;
     ud->callback = callback;
     ud->data = data;
-    fd_entry_t *fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
-            1048576 * 2, 1048576 * 2);
+    fd_entry_t *fde = NULL;
+    while (!fde) {
+        fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
+                    1048576 * 2, 1048576 * 2);
+    }
+    set_linger(fde->fd, 0);
     ud->fde = fde;
     mem_buf_def_init(&ud->recv_buf);
     cycle_connect(cycle, fde, slave_group[slave_id]->slave_addr, 48888, 3, connect_server_callback, ud);
@@ -284,8 +288,12 @@ void master_get_block(cycle_t *cycle, unsigned char *key, int16_t slave_id, int3
     ud->operation_callback = master_get_block_done;
     ud->callback = callback;
     ud->data = data;
-    fd_entry_t *fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
-            1048576 * 2, 1048576 * 2);
+    fd_entry_t *fde = NULL;
+    while (!fde) {
+        fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
+                    1048576 * 2, 1048576 * 2);
+    }
+    set_linger(fde->fd, 0);
     ud->fde = fde;
     mem_buf_def_init(&ud->recv_buf);
     cycle_connect(cycle, fde, slave_group[slave_id]->slave_addr, 48888, 3, connect_server_callback, ud);
@@ -305,7 +313,8 @@ void master_get_block_done(upstream_data_t *ud, int status) {
     }
     io_op_t *op = (io_op_t *)ud->data;
     if (ud->head.content_length != op->length) {
-        log(LOG_RUN_ERROR, "block size not match\n");
+        log(LOG_RUN_ERROR, "block size not match, content_length %u, length %u\n",
+                ud->head.content_length, op->length);
         flag = -1;
     }
     if (op->buf) {

@@ -254,7 +254,7 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
     ssize_t file_size;
     int ret;
     int16_t block_num;
-    int16_t i;
+    off_t i;
     int j;
     int16_t base;
     int max_current_slave;
@@ -294,6 +294,7 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
         ad->reply = strdup("file size <= 0, illegal\n");
         goto FINISH;
     }
+    log(LOG_DEBUG, "file size %d\n", file_size);
     block_num = file_size / BLOCK_SIZE;
     if (file_size % BLOCK_SIZE > 0) {
         block_num ++;
@@ -374,9 +375,10 @@ void admin_process_mvToLocal_done(admin_data_t *ad, int status, int block_id) {
     if (status == 0) {
         ad->map_block[block_id] = 1;
     } else {
+        log(LOG_RUN_ERROR, "status %d, block id %d\n", status, block_id);
         ad->map_block[block_id] = 2;
     }
-    int i;
+    off_t i;
     int all_succ = 1;
     int all_finish = 1;
     for (i = 0; i < ad->block_num; i ++) {
@@ -406,7 +408,7 @@ void admin_process_mvToLocal(admin_data_t *ad) {
     ad->fd = fd;
     ssize_t file_size;
     int16_t block_num;
-    int16_t i;
+    off_t i;
     int max_current_slave;
     block_t *bt;
     int io_id;
@@ -458,6 +460,8 @@ void admin_process_mvToLocal(admin_data_t *ad) {
         md5_update(&M, &i, sizeof(i)); //part index
         md5_final(key, &M);
         bt = (block_t *)hash_lookup(master.block_hash_table, key);
+        if (bt == NULL) {
+        }
         assert(bt);
         io_id = rand() % IO_THREAD_NUM;
         main_get_block(master.cycle, io_id, i, fd, i * BLOCK_SIZE,
@@ -614,6 +618,7 @@ void accept_admin_handler(cycle_t *cycle, fd_entry_t *listen_fde, void* data) {
 }
 
 int main (int argc, char **argv) {
+    set_limits();
     int daemon_mode = 0;
     int ch;
     while ((ch = getopt(argc, argv, "d")) != -1) {

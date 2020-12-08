@@ -23,7 +23,7 @@ typedef struct dir_entry_s {
 #pragma pack(1)
 typedef struct file_entry_s {
     char name[32];
-    uint32_t content_length;
+    uint64_t content_length;
     int8_t MR_ops_type;
 } file_entry_t;
 #pragma pack()
@@ -31,7 +31,7 @@ typedef struct file_entry_s {
 void name_node_init();
 int check_path_name_valid(char *path);
 int create_dir(char *path);
-int create_file(char *path, uint32_t content_length);
+int create_file(char *path, uint64_t content_length);
 int remove_dir(char *path);
 int remove_file(char *path);
 
