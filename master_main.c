@@ -156,13 +156,17 @@ void admin_process_status(admin_data_t *ad) {
     mem_buf_def_init(&mb);
     mem_buf_printf(&mb, "DFS\n");
     mem_buf_printf(&mb, "pid: %d\n", getpid());
-    mem_buf_printf(&mb, "\n%-30s%-20s%-20s%-20s%-20s\n",
-            "slave name", "slave id", "status", "total page num", "free page num");
+    mem_buf_printf(&mb, "\n%-30s%-20s%-20s%-25s%-20s%-20s\n",
+            "slave name", "slave id", "status", "slave_addr", "total page num", "free page num");
+    char ip[INET_ADDRSTRLEN];
     for (i = 1; i < MAX_SLAVE; i ++) {
         if (slave_group[i]) {
-            mem_buf_printf(&mb, "%-30s%-20hu%-20s%-20u%-20u\n",
-                    slave_group[i]->slave_name, slave_group[i]->slave_id,
+            inet_ntop(AF_INET, &slave_group[i]->slave_addr, ip, sizeof(ip));
+            mem_buf_printf(&mb, "%-30s%-20hu%-20s%-25s%-20u%-20u\n",
+                    slave_group[i]->slave_name,
+                    slave_group[i]->slave_id,
                     (slave_group[i]->is_online) ? "online" : "offline",
+                    ip,
                     slave_group[i]->total_page_num, slave_group[i]->free_page_num);
         }
     }
@@ -634,8 +638,7 @@ int main (int argc, char **argv) {
     struct in_addr ia; 
     ia.s_addr = INADDR_ANY;
     int listen_fd = open_listen_fd(
-            CYCLE_NONBLOCKING | CYCLE_REUSEADDR | CYCLE_REUSEPORT,
-            ia, 38888, 1); 
+            CYCLE_NONBLOCKING | CYCLE_REUSEADDR, ia, 38888, 1); 
     fd_entry_t *listen_fde = cycle_create_listen_fde(cycle, listen_fd);
     cycle_listen(cycle, listen_fde);
     cycle_set_timeout(cycle, &listen_fde->timer, 1000, accept_client_timeout, NULL);

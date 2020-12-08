@@ -211,7 +211,7 @@ void slave_register(cycle_t *cycle) {
     struct in_addr ia;
     fd_entry_t *fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
             1048576 * 2, 1048576 * 2);
-    safe_inet_addr("127.0.0.1", &ia);
+    safe_inet_addr(MASTER_NET, &ia);
     ud->fde = fde;
     mem_buf_def_init(&ud->recv_buf);
     cycle_connect(cycle, fde, ia, 38888, 3, connect_server_callback, ud);
@@ -245,13 +245,11 @@ void master_distribute_block(cycle_t *cycle, unsigned char *key, int16_t slave_i
     ud->operation_callback = master_distribute_block_done;
     ud->callback = callback;
     ud->data = data;
-    struct in_addr ia;
     fd_entry_t *fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
             1048576 * 2, 1048576 * 2);
-    safe_inet_addr("127.0.0.1", &ia);
     ud->fde = fde;
     mem_buf_def_init(&ud->recv_buf);
-    cycle_connect(cycle, fde, ia, 48888, 3, connect_server_callback, ud);
+    cycle_connect(cycle, fde, slave_group[slave_id]->slave_addr, 48888, 3, connect_server_callback, ud);
     log(LOG_DEBUG, "slave_id %hd, content_length %lu\n", slave_id, content_length);
 }
 
@@ -286,13 +284,11 @@ void master_get_block(cycle_t *cycle, unsigned char *key, int16_t slave_id, int3
     ud->operation_callback = master_get_block_done;
     ud->callback = callback;
     ud->data = data;
-    struct in_addr ia;
     fd_entry_t *fde = cycle_open_tcp_nobind(cycle, CYCLE_NONBLOCKING, 0,
             1048576 * 2, 1048576 * 2);
-    safe_inet_addr("127.0.0.1", &ia);
     ud->fde = fde;
     mem_buf_def_init(&ud->recv_buf);
-    cycle_connect(cycle, fde, ia, 48888, 3, connect_server_callback, ud);
+    cycle_connect(cycle, fde, slave_group[slave_id]->slave_addr, 48888, 3, connect_server_callback, ud);
     log(LOG_DEBUG, "slave_id %hd, content_length %lu\n", slave_id, content_length);
 }
 

@@ -6,8 +6,7 @@ int main () {
     struct in_addr ia; 
     ia.s_addr = INADDR_ANY;
     int listen_fd = open_listen_fd(
-            CYCLE_NONBLOCKING | CYCLE_REUSEADDR | CYCLE_REUSEPORT,
-            ia, 48888, 1); 
+            CYCLE_NONBLOCKING | CYCLE_REUSEADDR, ia, 48888, 1); 
     fd_entry_t *listen_fde = cycle_create_listen_fde(cycle, listen_fd);
     cycle_listen(cycle, listen_fde);
     cycle_set_timeout(cycle, &listen_fde->timer, 1000, accept_client_timeout, NULL);

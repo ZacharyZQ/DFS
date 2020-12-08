@@ -117,6 +117,10 @@ void master_process_slave_register(client_data_t *cd) {
     assert(!cd->head.content_length);
     log(LOG_RUN_ERROR, "the alloc slave id is %hd, slave name is %s\n",
             d->slave_id, d->slave_name);
+    struct sockaddr_in sin_peer;
+    socklen_t slt = sizeof(struct sockaddr_in);
+    getpeername(cd->fde->fd, (struct sockaddr*)&sin_peer, &slt);
+    d->slave_addr = sin_peer.sin_addr;
 }
 
 void master_process_slave_unregister(client_data_t *cd) {

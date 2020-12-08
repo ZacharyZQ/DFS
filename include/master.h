@@ -3,6 +3,7 @@
 #include "dir_tree.h"
 #include "io_thread.h"
 #define IO_THREAD_NUM 8
+#define MASTER_NET "127.0.0.1"
 typedef struct {
     cycle_t *cycle;
     dir_tree_t *tree;
@@ -31,6 +32,7 @@ typedef struct {
     int8_t is_online;
     uint32_t total_page_num;
     uint32_t free_page_num;
+    struct in_addr slave_addr;
 } slave_info_t;
 
 slave_info_t* slave_group[MAX_SLAVE];
