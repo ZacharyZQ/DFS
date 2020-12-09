@@ -81,7 +81,13 @@ echo mvToLocal spath dpath | nc 127.0.0.1 58888
 
 ## 实现机制
 
-epoll事件驱动
+epoll事件驱动 + 网络通信 + 匿名管道IPC
 
 master多线程IO加速
+
+[未完成]：slave多线程读写磁盘
+
+slave拥有mem缓存系统，基于LRU调度策略
+
+bfs自定义文件系统，伙伴系统磁盘分配算法
 
