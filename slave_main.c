@@ -18,6 +18,7 @@ int main (int argc, char **argv) {
     }
     log_init("log/slave.log");
     log(LOG_RUN_ERROR, "slave start\n");
+    bfs_init();
     cycle_t *cycle = init_cycle();
     struct in_addr ia; 
     ia.s_addr = INADDR_ANY;

@@ -295,8 +295,8 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
         goto FINISH;
     }
     log(LOG_DEBUG, "file size %d\n", file_size);
-    block_num = file_size / BLOCK_SIZE;
-    if (file_size % BLOCK_SIZE > 0) {
+    block_num = file_size / _BLOCK_SIZE;
+    if (file_size % _BLOCK_SIZE > 0) {
         block_num ++;
     }
     ad->block_num = block_num;
@@ -325,13 +325,13 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
     ad->map_block = (int8_t *)calloc(block_num, sizeof(int8_t));
     for (i = 0; i < block_num; i ++) {
         if (i == block_num - 1) {
-            if (file_size % BLOCK_SIZE == 0) {
-                block_length = BLOCK_SIZE;
+            if (file_size % _BLOCK_SIZE == 0) {
+                block_length = _BLOCK_SIZE;
             } else {
-                block_length = file_size % BLOCK_SIZE;
+                block_length = file_size % _BLOCK_SIZE;
             }
         } else {
-            block_length = BLOCK_SIZE;
+            block_length = _BLOCK_SIZE;
         }
         memcpy(slave_flag2, slave_flag1, max_current_slave * sizeof(uint8_t));
         bt = &bt_array[i];
@@ -357,7 +357,7 @@ void admin_process_mvFromLocal(admin_data_t *ad) {
             cursor = (cursor + 1) % max_current_slave;
         }
         io_id = rand() % IO_THREAD_NUM;
-        main_distribute_block(master.cycle, io_id, i, fd, i * BLOCK_SIZE,
+        main_distribute_block(master.cycle, io_id, i, fd, i * _BLOCK_SIZE,
                 block_length, bt, admin_process_mvFromLocal_done, ad);
         hash_join(master.block_hash_table, &bt->hash);
     }
@@ -438,21 +438,21 @@ void admin_process_mvToLocal(admin_data_t *ad) {
     assert(file_node->type == T_FILE);
     file_size = file_node->obj.file_info.content_length;
     assert(file_size > 0);
-    block_num = file_size / BLOCK_SIZE;
-    if (file_size % BLOCK_SIZE > 0) {
+    block_num = file_size / _BLOCK_SIZE;
+    if (file_size % _BLOCK_SIZE > 0) {
         block_num ++;
     }
     ad->block_num = block_num;
     ad->map_block = (int8_t *)calloc(block_num, sizeof(int8_t));
     for (i = 0; i < block_num; i ++) {
         if (i == block_num - 1) {
-            if (file_size % BLOCK_SIZE == 0) {
-                block_length = BLOCK_SIZE;
+            if (file_size % _BLOCK_SIZE == 0) {
+                block_length = _BLOCK_SIZE;
             } else {
-                block_length = file_size % BLOCK_SIZE;
+                block_length = file_size % _BLOCK_SIZE;
             }
         } else {
-            block_length = BLOCK_SIZE;
+            block_length = _BLOCK_SIZE;
         }
         md5_context M;
         md5_init(&M);
@@ -464,7 +464,7 @@ void admin_process_mvToLocal(admin_data_t *ad) {
         }
         assert(bt);
         io_id = rand() % IO_THREAD_NUM;
-        main_get_block(master.cycle, io_id, i, fd, i * BLOCK_SIZE,
+        main_get_block(master.cycle, io_id, i, fd, i * _BLOCK_SIZE,
                 block_length, bt,
                 admin_process_mvToLocal_done, ad);
         //every block has its own io thread

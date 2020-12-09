@@ -365,3 +365,45 @@ static inline void rbtree_right_rotate(rbtree_node_t** root, rbtree_node_t* sent
     temp->right = node;
     node->parent = temp;
 }
+
+rbtree_node_t *rbtree_prec(rbtree_t *tree, rbtree_key_t key) {
+    rbtree_node_t   *p = NULL;
+	rbtree_node_t   *sentinel = tree->sentinel;
+	rbtree_node_t	*node = tree->root;
+    rbtree_node_t   *temp = node;
+    if (node == sentinel) {
+        return NULL;
+    }
+    while (temp != sentinel) {
+        if (key < temp->key) {
+            temp = temp->left;
+        } else if (key == temp->key) {
+            return temp;
+        } else {
+            p = temp;
+            temp = temp->right;
+        }    
+    }    
+    return p;
+}
+
+rbtree_node_t *rbtree_succ(rbtree_t *tree, rbtree_key_t key) {
+    rbtree_node_t   *p = NULL;
+	rbtree_node_t   *node = tree->root;
+    rbtree_node_t   *temp = node;
+	rbtree_node_t   *sentinel = tree->sentinel;
+    if (node == sentinel) {
+        return NULL;
+    }
+    while (temp != sentinel) {
+        if (key < temp->key) {
+            p = temp;
+            temp = temp->left;
+        } else if (key == temp->key) {
+            return temp;
+        } else {
+            temp = temp->right;
+        }
+    }
+    return p;
+}

@@ -12,6 +12,7 @@
 #include <time.h>
 #include <errno.h>
 #include <unistd.h>
+#include <linux/fs.h>
 #include <arpa/inet.h>
 #include <assert.h>
 #include <fcntl.h>
@@ -20,6 +21,9 @@
 #include <pthread.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
 #include "cycle.h"
 #include "dir_tree.h"
 #include "epoll.h"

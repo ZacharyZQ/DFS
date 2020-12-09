@@ -13,7 +13,8 @@
 #define METHOD_ACK_FAILED ((uint16_t)8)
 
 #define PAGE_SIZE  (1 << 12)
-#define BLOCK_SIZE (1 << 20)
+#define _BLOCK_SIZE (1 << 20)
+#define PAGE_IN_BLOCK (_BLOCK_SIZE / PAGE_SIZE)
 
 #if 0
     |   ms_context_t |

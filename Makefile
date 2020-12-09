@@ -24,4 +24,5 @@ slave:$(OBJS)
 clean:
 	rm -f $(OBJS) test master slave
 	rm -f log/*
-	rm -f disk/*
+
+#rm -f disk/*

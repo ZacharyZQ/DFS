@@ -1,8 +1,9 @@
 #include "dfs_head.h"
 #define TEST_RBTREE
-#define MD5_TEST
-#define TEST_LOG
-#define TEST_NETWORK
+//#define MD5_TEST
+//#define TEST_LOG
+//#define TEST_NETWORK
+#define TEST_BFS
 
 void accept_handler_timeout(cycle_t *cycle, struct timer_s *timer,
         void* data)
@@ -98,6 +99,25 @@ void test_network() {
 #endif
 }
 
+void print_rbtree(rbtree_t *tree) {
+    if (rbtree_empty(tree)) {
+        return;
+    }
+    unsigned int key = 0;
+    rbtree_node_t *p = rbtree_min(tree->root, tree->sentinel);
+    printf("%-5lu  ", p->key);
+    key = p->key + 1;
+    while (!rbtree_empty(tree)) {
+        p = rbtree_succ(tree, key);
+        if (!p) {
+            printf("\n");
+            return ;
+        }
+        printf("%-5lu\t", p->key);
+        key = p->key + 1;
+    }
+}
+
 int main() {
 #ifdef TEST_RBTREE
     printf("test rbtree\n");
@@ -109,6 +129,7 @@ int main() {
         p->key = rand() % 100;
         rbtree_insert(&tree, p);
     }
+    print_rbtree(&tree);
     while (!rbtree_empty(&tree)) {
         rbtree_node_t *p = rbtree_min(tree.root, tree.sentinel);
         printf("%lu\t", p->key);
@@ -117,6 +138,29 @@ int main() {
     }
     printf("\n");
     printf("\n");
+    print_rbtree(&tree);
+#endif
+#ifdef TEST_BFS
+    log_init("log/test.log");
+    log(LOG_DEBUG, "hello world\n");
+    bfs_init();
+    default_disk_alloc_data_t *dad = bfs->disk_alloc->private_data;
+    printf("total_page_num: %ld\n", dad->total_page_num);
+    printf("free_page_num: %ld\n", dad->free_page_num);
+    printf("max_alloc_page: %d\n", dad->max_alloc_page);
+    int count = 10;
+    while (count > 0) {
+        int64_t addr = bfs->disk_alloc->page_alloc(count * 10);
+        printf("alloc %d: %ld\n", count * 10, addr);
+        for (i = 0; i < dad->free_space_size; i ++) {
+            if (!rbtree_empty(&dad->free_space[i])) {
+                printf("align: %d\n\t", 1 << i);
+            }
+            print_rbtree(&dad->free_space[i]);
+        }
+        count --;
+        printf("free_page_num: %ld\n", dad->free_page_num);
+    }
 #endif
 #ifdef MD5_TEST
     printf("test md5\n");

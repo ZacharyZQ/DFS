@@ -66,5 +66,7 @@ rbtree_min(rbtree_node_t* node, rbtree_node_t* sentinel) {
     return node;
 }
 
+rbtree_node_t *rbtree_prec(rbtree_t *tree, rbtree_key_t key);
+rbtree_node_t *rbtree_succ(rbtree_t *tree, rbtree_key_t key);
 
 #endif

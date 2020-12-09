@@ -2,44 +2,28 @@
 void client_data_destory(client_data_t *cd);
 
 void slave_process_get_block(client_data_t *cd) {
-    char *file_name = calloc(1, 200);
-    strcpy(file_name, "./disk/");
-    char *key_text = file_name + strlen("./disk/");
+    char key_text[64] = {0};
     md5_expand(cd->head.key, key_text);
-    log(LOG_DEBUG, "key text is %s, filename is %s\n", key_text, file_name);
-    int fd = open(file_name, O_RDONLY);
     int file_size;
-    int cursor = 0;
-    if (fd < 0) {
-        log(LOG_RUN_ERROR, "filename %s open failed\n", file_name);
-        goto FAILED;
-    }
     if (cd->content_buf) {
         free(cd->content_buf);
         cd->content_buf = NULL;
     }
-    file_size = lseek(fd, 0, SEEK_END);
+    block_location_t *bl = get_block(cd->head.key);
+    if (!bl) {
+        goto FAILED;
+    }
+    file_size = bl->length;
     cd->head.content_length = file_size;
     cd->content_buf = calloc(1, file_size);
-    while (cursor < file_size) {
-        int pread_ret = pread(fd, cd->content_buf + cursor, file_size - cursor, 0 + cursor);
-        if (pread_ret <= 0) {
-            if (errno_ignorable(errno)) {
-                continue;
-            }
-            goto FAILED;
-        } else {
-            cursor += pread_ret;
-        }
-    }
+    memcpy(cd->content_buf, bl->buf, bl->length);
     cd->head.method = METHOD_ACK_SUCC;
     if (cd->extra_buf) {
         free(cd->extra_buf);
         cd->extra_buf = NULL;
     }
     cd->head.extra_length = 0;
-    log(LOG_DEBUG, "process succ %s\n", file_name);
-    free(file_name);
+    log(LOG_DEBUG, "process succ %s\n", key_text);
     return;
 FAILED:
     cd->head.method = METHOD_ACK_FAILED;
@@ -53,21 +37,18 @@ FAILED:
         free(cd->extra_buf);
         cd->extra_buf = NULL;
     }
-    if (fd > 0) {
-        close(fd);
-    }
-    free(file_name);
 }
 
 void slave_process_create_block(client_data_t *cd) {
-    char *file_name = calloc(1, 200);
-    strcpy(file_name, "./disk/");
-    char *key_text = file_name + strlen("./disk/");
+    char key_text[64] = {0};
     md5_expand(cd->head.key, key_text);
-    log(LOG_DEBUG, "key text is %s, filename is %s\n", key_text, file_name);
-    FILE *fp = fopen(file_name, "w+");
-    if (!fp) {
-        log(LOG_RUN_ERROR, "filename %s open failed\n", file_name);
+    int32_t need_page = cd->head.content_length / PAGE_SIZE;
+    if (cd->head.content_length % PAGE_SIZE != 0) {
+        need_page ++;
+    }
+    int64_t off = bfs->disk_alloc->page_alloc(need_page);
+    if (off < 0) {
+        log(LOG_RUN_ERROR, "alloc disk space error\n");
         cd->head.method = METHOD_ACK_FAILED;
         cd->head.content_length = 0;
         free(cd->content_buf);
@@ -77,22 +58,21 @@ void slave_process_create_block(client_data_t *cd) {
             cd->extra_buf = NULL;
         }
         cd->head.extra_length = 0;
-        free(file_name);
         return ;
     }
-    fwrite(cd->content_buf, cd->head.content_length, 1, fp);
-    cd->head.method = METHOD_ACK_SUCC;
+    block_location_t *bl = init_block(cd->head.key, off, cd->head.content_length,
+            cd->content_buf);
+    assert(bl);
+    assert((bl->flag & B_DISK) && (bl->flag & B_MEM));
     cd->head.content_length = 0;
-    free(cd->content_buf);
     cd->content_buf = NULL;
+    cd->head.method = METHOD_ACK_SUCC;
     if (cd->extra_buf) {
         free(cd->extra_buf);
         cd->extra_buf = NULL;
     }
     cd->head.extra_length = 0;
-    fclose(fp);
-    log(LOG_DEBUG, "process succ %s\n", file_name);
-    free(file_name);
+    log(LOG_DEBUG, "process succ %s\n", key_text);
 }
 
 void master_process_slave_register(client_data_t *cd) {
