@@ -10,7 +10,7 @@ int bfs_init() {
     bfs->bmt = block_manager_init();
     bfs->disk_alloc = &default_disk_alloc;
     bfs->disk_fd = open(disk_name, O_RDWR);
-    unsigned sector_num;
+    uint64_t sector_num;
     if (bfs->disk_fd < 0) {
         log(LOG_RUN_ERROR, "open disk /%s/ error, %d\n", disk_name, errno);
         assert(0);
@@ -21,6 +21,7 @@ int bfs_init() {
     }
     if (S_ISREG(path_stat.st_mode)) {
         bfs->disk_size = path_stat.st_size;
+        log(LOG_RUN_ERROR, "disk is reg, %lu\n", bfs->disk_size);
     } else if (S_ISBLK(path_stat.st_mode)) {
         if (ioctl(bfs->disk_fd, BLKGETSIZE, &sector_num) < 0) { 
             log(LOG_RUN_ERROR, "ioct \'%s\' errno %d\n", disk_name, errno);
@@ -28,6 +29,7 @@ int bfs_init() {
         }
         /* in linux/fs.h, BLKGETSIZE return device size /512 */
         
+        log(LOG_RUN_ERROR, "disk is blk, %lu\n", sector_num);
         bfs->disk_size = sector_num << 9;
     } else {
         log(LOG_RUN_ERROR, "disk is not reg or blk\n");
@@ -114,6 +116,10 @@ void update_lru(block_manager_t *bmt, block_location_t *bl) {
 }
 
 void bfs_write(char *buf, uint32_t length, uint64_t offset) {
+#ifdef RECORD_IO
+    struct timespec time_start={0, 0},time_end={0, 0};
+    clock_gettime(CLOCK_REALTIME, &time_start);
+#endif
     int cursor = 0;
     while (cursor < length) {
         int write_size = pwrite(bfs->disk_fd, buf + cursor, length - cursor, offset + cursor);
@@ -128,9 +134,18 @@ void bfs_write(char *buf, uint32_t length, uint64_t offset) {
         }
         cursor += write_size;
     }
+#ifdef RECORD_IO
+    clock_gettime(CLOCK_REALTIME, &time_end);
+    log(LOG_RUN_ALERT, "RECORD: %ld ns, off:len %llu, %u\n", time_end.tv_nsec - time_start.tv_nsec, offset, length);
+#endif
 }
 
 void bfs_read(char *buf, uint32_t length, uint64_t offset) {
+#ifdef RECORD_IO
+    struct timespec time_start={0, 0},time_end={0, 0};
+    clock_gettime(CLOCK_REALTIME, &time_start);
+#endif
+
     int cursor = 0;
     while (cursor < length) {
         int read_size = pread(bfs->disk_fd, buf + cursor, length - cursor, offset + cursor);
@@ -145,6 +160,12 @@ void bfs_read(char *buf, uint32_t length, uint64_t offset) {
         }
         cursor += read_size;
     }
+
+#ifdef RECORD_IO
+    clock_gettime(CLOCK_REALTIME, &time_end);
+    log(LOG_RUN_ALERT, "RECORD: %ld ns, off:len %llu, %u\n", time_end.tv_nsec - time_start.tv_nsec, offset, length);
+#endif
+
 }
 
 int default_init_disk_alloc(uint64_t page_num) {

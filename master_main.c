@@ -188,6 +188,10 @@ void admin_process_ls(admin_data_t *ad) {
         mem_buf_def_init(&mb);
         dir_tree_printf(node, &mb, 0, 0);
         ad->reply = mb.buf;
+        if (strlen(ad->reply) == 0) {
+            free(ad->reply);
+            ad->reply = NULL;
+        }
     }
 }
 

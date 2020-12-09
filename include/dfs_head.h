@@ -43,4 +43,5 @@
 
 #define _GNU_SOURCE
 #define BACK_UP_COUNT 2
+#define RECORD_IO
 #endif

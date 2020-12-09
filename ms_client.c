@@ -46,7 +46,7 @@ void slave_process_create_block(client_data_t *cd) {
     if (cd->head.content_length % PAGE_SIZE != 0) {
         need_page ++;
     }
-    int64_t off = bfs->disk_alloc->page_alloc(need_page);
+    int64_t off = bfs->disk_alloc->page_alloc(need_page) * PAGE_SIZE;
     if (off < 0) {
         log(LOG_RUN_ERROR, "alloc disk space error\n");
         cd->head.method = METHOD_ACK_FAILED;
